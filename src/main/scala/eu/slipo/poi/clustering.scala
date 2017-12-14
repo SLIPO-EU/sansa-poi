@@ -15,12 +15,8 @@ import org.apache.spark.mllib.clustering.PowerIterationClustering
 
 object poiClustering {
   
-    /* Similarity function based on common categories of two pois
-     * 
-     * The similarity increase exponentially with the increasing number of common categories 
-     * 
-     * :param x categories of poi a
-     * :param y categories of poi b
+    /*
+     * Jaccard Similarity Coefficient between two sets of categories corresponding to two pois
      * */
     def jaccardSimilarity(x: Iterable[String], y: Iterable[String]): Double = {
       val x_ = x.toSet
