@@ -15,21 +15,22 @@ import org.apache.spark.mllib.clustering.PowerIterationClustering
 
 object poiClustering {
   
-    val termValueUri = "http://slipo.eu/def#termValue"
-    val termPrefix = "http://slipo.eu/id/term/"
-    val categoriesFile = "resources/results/categories"
     val dataSource = "resources/data/tomtom_pois_austria_v0.3.nt"  // there are 312385 pois
+    val termValueUri = "http://slipo.eu/def#termValue"
+    val termPrefix = "http://slipo.eu/id/term/" 
     val typePOI = "http://slipo.eu/def#POI"
     val categoryPOI = "http://slipo.eu/def#category"
     val termPOI = "http://slipo.eu/def#termValue"
     val poiPrefix = "http://slipo.eu/id/poi/"
+    val categoriesFile = "resources/results/categories"
     val results = "resources/results/clustering_result.txt"
+    val poiCategoriesFile = "resources/results/poi_categories"
     val fileWriter = new PrintWriter(results)
     
     /*
      * Jaccard Similarity Coefficient between two sets of categories corresponding to two pois
      * */
-    def jaccardSimilarity(x: Iterable[String], y: Iterable[String]): Double = {
+    def jaccardSimilarity(x: Iterable[Int], y: Iterable[Int]): Double = {
       val x_ = x.toSet
       val y_ = y.toSet
       val union_l = x_.toList.length + y_.toList.length
@@ -75,10 +76,11 @@ object poiClustering {
       // find all the categories of pois
       val poiFlatCategories = data.filter(x => x.getPredicate.toString().equalsIgnoreCase(categoryPOI))
       // from 'Node' to string, and remove common prefix
-      val poiRawCategories = poiFlatCategories.map(x => (x.getSubject.toString().replace(poiPrefix, ""), x.getObject.toString().replace(termPrefix, "")))
+      val poiRawCategories = poiFlatCategories.map(x => (x.getSubject.toString().replace(poiPrefix, ""), x.getObject.toString().replace(termPrefix, "").toInt))
       // get the categories for each poi TODO not encourage to use groupByKey as it is slow for large dataset, sample 1% to reduce the computation costs
       val poiCategories = poiRawCategories.groupByKey().sample(false, 0.01, 0)
-      // get the number of pois
+      // get the number of pois, and save corresponding categories
+      poiCategories.sortByKey().coalesce(1, shuffle=true).saveAsTextFile(poiCategoriesFile)
       fileWriter.println(s"Number of POIs: ${poiCategories.count().toString()}")
       // considering PIC https://spark.apache.org/docs/1.5.1/mllib-clustering.html, build ((sid, ()), (did, ())) RDD
       val pairwisePOICategories = poiCategories.cartesian(poiCategories).filter{ case (a, b) => a._1.toInt < b._1.toInt }
