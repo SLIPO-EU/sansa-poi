@@ -22,8 +22,8 @@ object poiClustering {
       val x_ = x.toSet
       val y_ = y.toSet
       val union_l = x_.toList.length + y_.toList.length
-      val intersect_l = x_.intersect(y_).toList.length  // get the common categories of two pois
-      intersect_l / (union_l - intersect_l)  // if there is no common categories, then similarity is 0
+      val intersect_l = x_.intersect(y_).toList.length
+      intersect_l / (union_l - intersect_l)
     }
     
     def main(args: Array[String]){
@@ -46,7 +46,7 @@ object poiClustering {
       // read NTriple file, get RDD contains triples
       val data = NTripleReader.load(sparkSession, dataSource)
       
-      // find all the categories of each point of interest(poi)
+      // find all the categories of pois
       val poiFlatCategories = data.filter(x => x.getPredicate.toString().equalsIgnoreCase(categoryPOI))
       
       // from 'Node' to string, and remove common prefix
@@ -58,7 +58,7 @@ object poiClustering {
       val numPOIs = poiCategories.count().toString()
       fileWriter.println(s"Number of POIs: $numPOIs")
       
-      // considering PCI https://spark.apache.org/docs/1.5.1/mllib-clustering.html, build ((sid, ()), (did, ())) RDD
+      // considering PIC https://spark.apache.org/docs/1.5.1/mllib-clustering.html, build ((sid, ()), (did, ())) RDD
       val pairwisePOICategories = poiCategories.cartesian(poiCategories).filter{ case (a, b) => a._1.toInt < b._1.toInt }
       
       // from ((sid, ()), (did, ())) to (sid, did, similarity)
