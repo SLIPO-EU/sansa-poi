@@ -2,11 +2,15 @@ package eu.slipo.poi
 
 import java.net.URI
 import java.io.PrintWriter
+import java.util.Calendar
 
 import net.sansa_stack.rdf.spark.io.NTripleReader
 import net.sansa_stack.rdf.spark.model.TripleRDD
 import net.sansa_stack.rdf.spark.analytics
 import org.apache.spark.rdd._
+import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.types.StructField
+import org.apache.spark.sql.types.DataTypes
 import org.apache.jena.graph.Triple
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.SparkContext
@@ -25,7 +29,10 @@ object poiClustering {
     val categoriesFile = "resources/results/categories"
     val results = "resources/results/clustering_result.txt"
     val poiCategoriesFile = "resources/results/poi_categories"
+    val runTimeStatics = "resources/results/runtime.txt"
+    val now = Calendar.getInstance()
     val fileWriter = new PrintWriter(results)
+    val runTimeSta = new PrintWriter(runTimeStatics)
     
     /*
      * Jaccard Similarity Coefficient between two sets of categories corresponding to two pois
@@ -41,23 +48,21 @@ object poiClustering {
     /*
      * Write (category_id, set(category_values)) to file
      * */
-    def writeCategoryValues(data: RDD[Triple]) = {
+    def getCategoryValues(sparkSession: SparkSession, data: RDD[Triple]): RDD[(Int, Set[String])] = {
       // find all categories by id(for category aggregation)
       val categoriesValue = data.filter(x => x.getPredicate.toString().equalsIgnoreCase(termValueUri))
       // get category id and it's corresponding value
       val categoriesIdValue = categoriesValue.map(x => (x.getSubject.toString().replace(termPrefix, "").toInt, x.getObject.toString()))
       // group by id and put all values of category to a set
-      val categoriesIdValues = categoriesIdValue.groupByKey().sortByKey().map(x => (x._1, x._2.toSet))
-      // save category id and corresponding values to file
-      categoriesIdValues.coalesce(1, shuffle=true).saveAsTextFile(categoriesFile)
+      categoriesIdValue.groupByKey().sortByKey().map(x => (x._1, x._2.toSet))
     }
     
     /*
      * Write clustering results to file
      * */
-    def writeClusteringResult(clusters: Map[Int, Array[Long]]) = {
+    def writeClusteringResult(clusters: Map[Int, Array[Long]], categories: RDD[(Int, Set[String])], poiCategories: RDD[(Int, Iterable[Int])]) = {
       val assignments = clusters.toList.sortBy { case (k, v) => v.length }
-      val assignmentsStr = assignments.map { case (k, v) => s"$k -> ${v.sorted.mkString("[", ",", "]")}"}.mkString("\n")
+      val assignmentsStr = assignments.map { case (k, v) => s"$k -> ${v.sorted.mkString("[", ",", "]")}, ${v.map(poi => poiCategories.lookup(poi.toInt).head.mkString("(", "," ,")")).mkString("[", ",", "]")}, ${v.map(poi => poiCategories.lookup(poi.toInt).head.map(category => categories.lookup(category).mkString(",")).mkString("(", ",", ")")).mkString("[", ",", "]")}"}.mkString("\n")
       val sizesStr = assignments.map {_._2.length}.sorted.mkString("(", ",", ")")
       fileWriter.println(s"Cluster assignments:\n $assignmentsStr\n")
       fileWriter.println(s"cluster sizes:\n $sizesStr\n")
@@ -70,28 +75,38 @@ object poiClustering {
       .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
       .appName("Triple reader resources/data/tomtom_pois_austria_v0.3.nt")
       .getOrCreate()
+      sparkSession.conf.set("spark.executor.memory", "6g")
+      sparkSession.conf.set("spark.driver.memory", "6g")
       
+      runTimeSta.println(s"Start loading data: ${Calendar.getInstance().getTime()}")
       // read NTriple file, get RDD contains triples
       val data = NTripleReader.load(sparkSession, dataSource)
+      runTimeSta.println(s"Finish loading data: ${Calendar.getInstance().getTime()}")
       // find all the categories of pois
       val poiFlatCategories = data.filter(x => x.getPredicate.toString().equalsIgnoreCase(categoryPOI))
       // from 'Node' to string, and remove common prefix
-      val poiRawCategories = poiFlatCategories.map(x => (x.getSubject.toString().replace(poiPrefix, ""), x.getObject.toString().replace(termPrefix, "").toInt))
+      val poiRawCategories = poiFlatCategories.map(x => (x.getSubject.toString().replace(poiPrefix, "").toInt, x.getObject.toString().replace(termPrefix, "").toInt))
       // get the categories for each poi TODO not encourage to use groupByKey as it is slow for large dataset, sample 1% to reduce the computation costs
-      val poiCategories = poiRawCategories.groupByKey().sample(false, 0.01, 0)
+      runTimeSta.println(s"Start group by: ${Calendar.getInstance().getTime()}")
+      val poiCategories = poiRawCategories.groupByKey().sample(false, 0.001, 0)
+      runTimeSta.println(s"Finish group by: ${Calendar.getInstance().getTime()}")
       // get the number of pois, and save corresponding categories
-      poiCategories.sortByKey().coalesce(1, shuffle=true).saveAsTextFile(poiCategoriesFile)
+      //poiCategories.sortByKey().coalesce(1, shuffle=true).saveAsTextFile(poiCategoriesFile)
       fileWriter.println(s"Number of POIs: ${poiCategories.count().toString()}")
       // considering PIC https://spark.apache.org/docs/1.5.1/mllib-clustering.html, build ((sid, ()), (did, ())) RDD
+      runTimeSta.println(s"Start cartesian: ${Calendar.getInstance().getTime()}")
       val pairwisePOICategories = poiCategories.cartesian(poiCategories).filter{ case (a, b) => a._1.toInt < b._1.toInt }
+      runTimeSta.println(s"Finish cartesian: ${Calendar.getInstance().getTime()}")
       // from ((sid, ()), (did, ())) to (sid, did, similarity)
       val pairwisePOISimilarity = pairwisePOICategories.map(x => (x._1._1.toString().toLong, x._2._1.toString().toLong, jaccardSimilarity(x._1._2, x._2._2)))
       // run pic, 50 centroids and 5 iterations
-      val model = new PowerIterationClustering().setK(50).setMaxIterations(5).setInitializationMode("degree").run(pairwisePOISimilarity)
+      runTimeSta.println(s"Start clustering: ${Calendar.getInstance().getTime()}")
+      val model = new PowerIterationClustering().setK(3).setMaxIterations(1).setInitializationMode("degree").run(pairwisePOISimilarity)
       val clusters = model.assignments.collect().groupBy(_.cluster).mapValues(_.map(_.id))
+      runTimeSta.println(s"Finish clustering: ${Calendar.getInstance().getTime()}")
       // get categories and clustering result
-      writeCategoryValues(data)
-      writeClusteringResult(clusters)
+      //writeCategoryValues(sparkSession, data)
+      writeClusteringResult(clusters, getCategoryValues(sparkSession, data), poiCategories)
       
       // stop spark session
       sparkSession.stop()
