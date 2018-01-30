@@ -179,7 +179,7 @@ object poiClustering {
             oneHotMatrix(i)(j) = 0
          }
       }
-      // create one hot encoded matrix
+      // create one hot encoded matrix, row by row
       var count = 0
       poiCategories.collect().foreach(x => {x._2.foreach(y => {oneHotMatrix(count)(categoryArray.indexOf(y)) = 1}); count += 1})
       // create schema to put in RDD
@@ -190,10 +190,10 @@ object poiClustering {
         schema.add(i.toString(), IntegerType, true)
         featureColumns(i) = i.toString()
       }
-      println(schema.fields.length)
+      println(schema.fields.length)  // TODO no idea why the length of schema is 0
       val oneHotEncodedRDD = spark.sparkContext.parallelize(oneHotMatrix.toSeq).map(x => Row(x.map(y => (y))))
       val oneHotEncodedDF = spark.createDataFrame(oneHotEncodedRDD, schema)
-      
+      // set up 'features' column
       val assembler = (new VectorAssembler().setInputCols(featureColumns).setOutputCol("features"))
       val featureData = assembler.transform(oneHotEncodedDF)
       val kmeans = new KMeans().setK(2).setSeed(1L).setFeaturesCol("features").setPredictionCol("prediction")
@@ -229,29 +229,29 @@ object poiClustering {
       //oneHotEncoding(poiCategories, spark)
       
       // get the number of pois, and save corresponding categories, TODO we seems not need to do toInt
-      //val numberPOIs = poiCategories.count().toString().toInt
-      //fileWriter.println(s"Number of POIs: ${poiCategories.count().toString()}")
+      val numberPOIs = poiCategories.count().toString().toInt
+      fileWriter.println(s"Number of POIs: ${poiCategories.count().toString()}")
       
       // considering PIC https://spark.apache.org/docs/1.5.1/mllib-clustering.html, build ((sid, ()), (did, ())) RDD
-      //val pairwisePOICategories = poiCategories.cartesian(poiCategories).filter{ case (a, b) => a._1.toInt < b._1.toInt }
+      val pairwisePOICategories = poiCategories.cartesian(poiCategories).filter{ case (a, b) => a._1.toInt < b._1.toInt }
       
       // from ((sid, ()), (did, ())) to (sid, did, similarity)
-      //val pairwisePOISimilarity = pairwisePOICategories.map(x => (x._1._1.toString().toLong, x._2._1.toString().toLong, jaccardSimilarity(x._1._2, x._2._2)))
+      val pairwisePOISimilarity = pairwisePOICategories.map(x => (x._1._1.toString().toLong, x._2._1.toString().toLong, jaccardSimilarity(x._1._2, x._2._2)))
       
       // distance RDD, from (sid, did, similarity) to (sid, did, distance)
-      //val distancePairs = pairwisePOISimilarity.map(x => (x._1, x._2, 1.0 - x._3))
+      val distancePairs = pairwisePOISimilarity.map(x => (x._1, x._2, 1.0 - x._3))
       
       // generate coordindates in 2 dimension
-      //val coordinates = multiDimensionScaling(distancePairs, numberPOIs, 2).map(x => (x(0), x(1)))
+      val coordinates = multiDimensionScaling(distancePairs, numberPOIs, 2).map(x => (x(0), x(1)))
      
       // kmeans clustering, number of clusters 2
-      //println(kmeansClustering(coordinates, spark, 2))
+      println(kmeansClustering(coordinates, spark, 2))
       
       // dbscan clustering, TODO solve scala version flicts with SANSA
       // dbscanClustering(coordinates, spark)
       
       // run pic, 50 centroids and 5 iterations
-      //piClustering(pairwisePOISimilarity, spark, dataRDD, poiCategories)
+      piClustering(pairwisePOISimilarity, spark, dataRDD, poiCategories)
       
       // stop spark session
       spark.stop()
