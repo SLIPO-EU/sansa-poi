@@ -30,6 +30,7 @@ object poiClustering {
     val termValueUri = "http://slipo.eu/def#termValue"
     val termPrefix = "http://slipo.eu/id/term/" 
     val typePOI = "http://slipo.eu/def#POI"
+    val coordinatesPredicate = "http://www.opengis.net/ont/geosparql#asWKT"
     val categoryPOI = "http://slipo.eu/def#category"
     val termPOI = "http://slipo.eu/def#termValue"
     val poiPrefix = "http://slipo.eu/id/poi/"
@@ -69,9 +70,9 @@ object poiClustering {
     /*
      * Write clustering results to file
      * */
-    def writeClusteringResult(clusters: Map[Int, Array[Long]], categories: RDD[(Int, Set[String])], poiCategories: RDD[(Int, Iterable[Int])]) = {
+    def writeClusteringResult(clusters: Map[Int, Array[Long]], categories: RDD[(Int, Set[String])], poiCategories: RDD[(Int, Iterable[Int])], poiCoordinates: RDD[(Int, String)]) = {
       val assignments = clusters.toList.sortBy { case (k, v) => v.length }
-      val assignmentsStr = assignments.map { case (k, v) => s"$k -> ${v.sorted.mkString("[", ",", "]")}, ${v.map(poi => poiCategories.lookup(poi.toInt).head.mkString("(", "," ,")")).mkString("[", ",", "]")}, ${v.map(poi => poiCategories.lookup(poi.toInt).head.map(category => categories.lookup(category).mkString(",")).mkString("(", ",", ")")).mkString("[", ",", "]")}"}.mkString("\n")
+      val assignmentsStr = assignments.map { case (k, v) => s"$k -> ${v.sorted.mkString("[", ",", "]")}, ${v.map(poi => poiCoordinates.lookup(poi.toInt)).mkString("[", ",", "]")}, ${v.map(poi => poiCategories.lookup(poi.toInt).head.mkString("(", "," ,")")).mkString("[", ",", "]")}, ${v.map(poi => poiCategories.lookup(poi.toInt).head.map(category => categories.lookup(category).mkString(",")).mkString("(", ",", ")")).mkString("[", ",", "]")}"}.mkString("\n")
       val sizesStr = assignments.map {_._2.length}.sorted.mkString("(", ",", ")")
       fileWriter.println(s"Cluster assignments:\n $assignmentsStr\n")
       fileWriter.println(s"cluster sizes:\n $sizesStr\n")
@@ -81,11 +82,11 @@ object poiClustering {
     /*
      * Spectral clustering
      * */
-    def piClustering(pairwisePOISimilarity: RDD[(Long, Long, Double)], sparkSession: SparkSession, dataRDD: RDD[Triple], poiCategories: RDD[(Int, Iterable[Int])]) = {
+    def piClustering(pairwisePOISimilarity: RDD[(Long, Long, Double)], sparkSession: SparkSession, dataRDD: RDD[Triple], poiCategories: RDD[(Int, Iterable[Int])], poiCoordinates: RDD[(Int, String)]) = {
       val model = new PowerIterationClustering().setK(3).setMaxIterations(1).setInitializationMode("degree").run(pairwisePOISimilarity)
       val clusters = model.assignments.collect().groupBy(_.cluster).mapValues(_.map(_.id))
       // get categories and clustering result
-      writeClusteringResult(clusters, getCategoryValues(sparkSession, dataRDD), poiCategories)
+      writeClusteringResult(clusters, getCategoryValues(sparkSession, dataRDD), poiCategories, poiCoordinates)
     }
     
     
@@ -126,6 +127,7 @@ object poiClustering {
       model.labeledPoints.map(p =>  s"${p.x},${p.y},${p.cluster}").saveAsTextFile("resources/results/dbscan.txt")
     }
     
+   
     /*
      * Multi-dimensional scaling
      * */
@@ -160,6 +162,7 @@ object poiClustering {
       val mds = new MDS(distanceMatrix, dimension, true)
       mds.getCoordinates
     }
+    
     
     /*
      * One hot encoding categorical data
@@ -223,23 +226,28 @@ object poiClustering {
       // find all the categories of pois
       val poiFlatCategories = dataRDD.filter(x => x.getPredicate.toString().equalsIgnoreCase(categoryPOI))
       
+      // poi coordinates
+      val pattern = "POINT(.+ .+)".r
+      val poiCoordinates = dataRDD.filter(x => x.getPredicate.toString().equalsIgnoreCase(coordinatesPredicate)).map(x => (x.getSubject.toString().replace(poiPrefix, "").replace("/geometry", "").toInt, pattern.findFirstIn(x.getObject.toString()).head.replace("POINT", "").replace("^^http://www.opengis.net/ont/geosparql#wktLiteral", "").replaceAll("^\"|\"$", "")))
+      
       // from 'Node' to string, and remove common prefix
       val poiRawCategories = poiFlatCategories.map(x => (x.getSubject.toString().replace(poiPrefix, "").toInt, x.getObject.toString().replace(termPrefix, "").toInt))
       
       // get the categories for each poi TODO not encourage to use groupByKey as it is slow for large dataset, sample 1% to reduce the computation costs
-      val poiCategories = poiRawCategories.groupByKey().sample(false, 0.0001, 0)
+      val poiCategories = poiRawCategories.groupByKey().sample(false, 0.001, 0)
       
-      oneHotEncoding(poiCategories, spark)
+      //oneHotEncoding(poiCategories, spark)
       
       // get the number of pois, and save corresponding categories, TODO we seems not need to do toInt
-      //val numberPOIs = poiCategories.count().toString().toInt
-      //fileWriter.println(s"Number of POIs: ${poiCategories.count().toString()}")
+      val numberPOIs = poiCategories.count().toString().toInt
+      println(numberPOIs)
+      fileWriter.println(s"Number of POIs: ${numberPOIs}")
       
       // considering PIC https://spark.apache.org/docs/1.5.1/mllib-clustering.html, build ((sid, ()), (did, ())) RDD
-      //val pairwisePOICategories = poiCategories.cartesian(poiCategories).filter{ case (a, b) => a._1.toInt < b._1.toInt }
+      val pairwisePOICategories = poiCategories.cartesian(poiCategories).filter{ case (a, b) => a._1.toInt < b._1.toInt }
       
       // from ((sid, ()), (did, ())) to (sid, did, similarity)
-      //val pairwisePOISimilarity = pairwisePOICategories.map(x => (x._1._1.toString().toLong, x._2._1.toString().toLong, jaccardSimilarity(x._1._2, x._2._2)))
+      val pairwisePOISimilarity = pairwisePOICategories.map(x => (x._1._1.toString().toLong, x._2._1.toString().toLong, jaccardSimilarity(x._1._2, x._2._2)))
       
       // distance RDD, from (sid, did, similarity) to (sid, did, distance)
       //val distancePairs = pairwisePOISimilarity.map(x => (x._1, x._2, 1.0 - x._3))
@@ -254,9 +262,10 @@ object poiClustering {
       // dbscanClustering(coordinates, spark)
       
       // run pic, 50 centroids and 5 iterations
-      //piClustering(pairwisePOISimilarity, spark, dataRDD, poiCategories)
+      piClustering(pairwisePOISimilarity, spark, dataRDD, poiCategories, poiCoordinates)
       
       // stop spark session
+      fileWriter.close()
       spark.stop()
     }
 }
