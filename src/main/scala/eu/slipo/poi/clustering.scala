@@ -72,7 +72,7 @@ object poiClustering {
      * */
     def writeClusteringResult(clusters: Map[Int, Array[Long]], categories: RDD[(Int, Set[String])], poiCategories: RDD[(Int, Iterable[Int])], poiCoordinates: RDD[(Int, (Double, Double))]) = {
       val assignments = clusters.toList.sortBy { case (k, v) => v.length }
-      val assignmentsStr = assignments.map { case (k, v) => s"$k -> ${v.sorted.mkString("[", ",", "]")}, ${v.map(poi => poiCoordinates.lookup(poi.toInt).head).mkString("[", "," ,"]")}, ${v.map(poi => poiCategories.lookup(poi.toInt).head.mkString("(", "," ,")")).mkString("[", ",", "]")}, ${v.map(poi => poiCategories.lookup(poi.toInt).head.map(category => categories.lookup(category).mkString(",")).mkString("(", ",", ")")).mkString("[", ",", "]")}"}.mkString("\n")
+      val assignmentsStr = assignments.map { case (k, v) => s"$k -> ${v.mkString("[", ",", "]")}, ${v.map(poi => (poiCoordinates.lookup(poi.toInt).head, poiCategories.lookup(poi.toInt).head.mkString("(", "," ,")"))).mkString("[", ",", "]")}, ${v.map(poi => poiCategories.lookup(poi.toInt).head.map(category => categories.lookup(category).mkString(",")).mkString("(", ",", ")")).mkString("[", ",", "]")}"}.mkString("\n")
       val sizesStr = assignments.map {_._2.length}.sorted.mkString("(", ",", ")")
       fileWriter.println(s"Cluster Assignments:\n $assignmentsStr\n")
       fileWriter.println(s"Cluster Sizes:\n $sizesStr\n")
@@ -229,7 +229,7 @@ object poiClustering {
       
       // find pois in vinna, 72549 in total
       val poiVinna = poiCoordinates.mapValues(x => {val coordinates = x.replace("(", "").replace(")", "").split(" ")
-                                    (coordinates(0).toDouble, coordinates(1).toDouble)}).filter(x => (x._2._1>=(16.192851) && x._2._1<=(16.593533)) && (x._2._2>=(48.104194) && x._2._2<=(48.316388))).sample(false, 0.005, 0).persist()
+                                    (coordinates(0).toDouble, coordinates(1).toDouble)}).filter(x => (x._2._1>=(16.192851) && x._2._1<=(16.593533)) && (x._2._2>=(48.104194) && x._2._2<=(48.316388))).sample(false, 0.001, 0).persist()
       val keys = poiVinna.keys.collect()
       /*val keyValues = poiVinna.collect().toArray
       println(s"poi Vinna: ${keyValues(0)}")*/
