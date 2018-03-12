@@ -21,12 +21,15 @@ import org.apache.spark.mllib.linalg.Vectors
 import smile.mds.MDS
 import scala.collection.mutable.ArrayBuffer
 import org.apache.spark.ml.feature.VectorAssembler
+import net.sansa_stack.ml.spark.clustering.{ RDFGraphPICClustering => RDFGraphPICClusteringAlg }
+
+
 
 
 
 object poiClustering {
   
-    val dataSource = "resources/data/herold_pois_austria_v0.3.nt"  // there are 312385 pois
+    val dataSource = "resources/data/herold_pois_austria_v0.3.nt"  // there are 312385 pois for tomtom and 350053 for herold
     val termValueUri = "http://slipo.eu/def#termValue"
     val termPrefix = "http://slipo.eu/id/term/" 
     val typePOI = "http://slipo.eu/def#POI"
@@ -115,6 +118,7 @@ object poiClustering {
       model.getPredictionCol
       
     }
+    
     
     /*
      * DBSCAN
@@ -229,7 +233,7 @@ object poiClustering {
       
       // find pois in vinna, 72549 in total
       val poiVinna = poiCoordinates.mapValues(x => {val coordinates = x.replace("(", "").replace(")", "").split(" ")
-                                    (coordinates(0).toDouble, coordinates(1).toDouble)}).filter(x => (x._2._1>=(16.192851) && x._2._1<=(16.593533)) && (x._2._2>=(48.104194) && x._2._2<=(48.316388))).sample(false, 0.001, 0).persist()
+                                    (coordinates(0).toDouble, coordinates(1).toDouble)}).filter(x => (x._2._1>=(16.192851) && x._2._1<=(16.593533)) && (x._2._2>=(48.104194) && x._2._2<=(48.316388))).sample(false, 0.005, 0).persist()
       val keys = poiVinna.keys.collect()
       /*val keyValues = poiVinna.collect().toArray
       println(s"poi Vinna: ${keyValues(0)}")*/
