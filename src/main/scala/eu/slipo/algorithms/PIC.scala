@@ -5,7 +5,7 @@ import org.apache.spark.sql._
 import org.apache.spark.graphx.Graph
 import org.apache.spark.graphx.Edge
 import org.apache.spark.mllib.clustering.PowerIterationClustering
-import net.sansa_stack.ml.spark.clustering.RDFGraphPICClustering
+import net.sansa_stack.ml.spark.clustering.RDFGraphPowerIterationClustering
 
 class PIC {
   

@@ -1,8 +1,15 @@
 package eu.slipo.algorithms
 
+import org.apache.spark.sql._
+import org.apache.spark.sql.types._
 import org.apache.spark.ml.clustering.KMeans
+import org.apache.spark.sql.types.StructField
+import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.ml.feature.VectorAssembler
 
-class kmeans {
+
+class Kmeans {
   
     /*
      * K-means clustering based on given coordinates

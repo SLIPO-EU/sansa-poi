@@ -1,5 +1,7 @@
 package eu.slipo.algorithms
 
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.mllib.clustering.dbscan.DBSCAN
 
 class dbSCAN {
