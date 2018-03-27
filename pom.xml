@@ -153,12 +153,19 @@
       <artifactId>smile-netlib</artifactId>
       <version>1.5.0</version>
     </dependency>
-    
-    <dependency>
-	    <groupId>net.liftweb</groupId>
-	    <artifactId>lift-json_2.12</artifactId>
-	    <version>3.2.0</version>
-	</dependency>
+
+      <dependency>
+          <groupId>org.json4s</groupId>
+          <artifactId>json4s-native_2.12</artifactId>
+          <version>3.5.3</version>
+      </dependency>
+
+      <dependency>
+          <groupId>org.json4s</groupId>
+          <artifactId>json4s-jackson_2.12</artifactId>
+          <version>3.5.3</version>
+      </dependency>
+
 
   </dependencies>
   

@@ -1,3 +1,3 @@
 package eu.slipo.datatypes
 
-case class Categories(categories: Set[String])
+case class Categories(categories: scala.collection.mutable.Set[String])

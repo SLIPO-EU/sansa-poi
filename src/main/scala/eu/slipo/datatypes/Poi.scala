@@ -1,3 +1,3 @@
 package eu.slipo.datatypes
 
-case class Poi(id: Int, coordinate: Coordinate, categories: Categories)
+case class Poi(id: Long, coordinate: Coordinate, categories: Categories)
