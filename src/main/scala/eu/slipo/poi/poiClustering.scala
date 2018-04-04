@@ -163,8 +163,8 @@ object poiClustering {
       
       // generate coordindates in 2 dimension, and run kmeans
       val poi2Coordinates = new multiDS().multiDimensionScaling(distancePairs, poiCategorySetVinna.count().toInt, 2)
-      val clustersMDSKM = new Kmeans().kmeansClustering(poi2Coordinates, 2, spark)
-      writeClusteringResult(clustersKM, pois, mdsKMFileWriter)
+      val clustersMDSKM = new Kmeans().kmeansClustering(poi2Coordinates, 15, spark)
+      writeClusteringResult(clustersMDSKM, pois, mdsKMFileWriter)
 
       // dbscan clustering, TODO solve scala version flicts with SANSA
       // dbscanClustering(coordinates, spark)
