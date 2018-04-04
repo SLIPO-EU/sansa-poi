@@ -10,15 +10,15 @@ class multiDS {
      * 
      * Generate n dimensional coordinates based on input similarity matrix
      * */
-    def multiDimensionScaling(distancePairs: RDD[(Long, Long, Double)], numPOIS: Int, dimension: Int): Array[Array[Double]] = {
+    def multiDimensionScaling(distancePairs: RDD[(Long, Long, Double)], numPOIS: Int, dimension: Int): Array[(Long, Double, Double)] = {
       // vector keep recorded poi
       var vector = Array.ofDim[Long](numPOIS)
       // positive symmetric distance matrix
       var distanceMatrix = Array.ofDim[Double](numPOIS, numPOIS)
       // initialize distance matrix
-      for (i <- 0 to numPOIS-1) {
+      for (i <- 0 until numPOIS) {
          vector(i) = 0
-         for ( j <- 0 to numPOIS-1) {
+         for ( j <- 0 until numPOIS) {
             distanceMatrix(i)(j) = 0.0
          }
       }
@@ -34,12 +34,12 @@ class multiDS {
                                           }
                                           val i1 = vector.indexOf(x._1) // get the index as x-y axis for matrix
                                           val i2 = vector.indexOf(x._2) // get the index as x-y axis for matrix
-                                          distanceMatrix(i1)(i2) = x._3;
-                                          distanceMatrix(i2)(i1) = x._3;
+                                          distanceMatrix(i1)(i2) = x._3
+                                          distanceMatrix(i2)(i1) = x._3
                                           })
       // create coordinates
       val mds = new MDS(distanceMatrix, dimension, true)
-      mds.getCoordinates
+      mds.getCoordinates.zip(vector).map(x => (x._2, x._1.head.toDouble, x._1.last.toDouble))
     }
     
 }

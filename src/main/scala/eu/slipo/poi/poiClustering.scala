@@ -6,7 +6,7 @@ import net.sansa_stack.rdf.spark.io.NTripleReader
 import org.apache.spark.rdd._
 import org.apache.spark.sql._
 import org.apache.jena.graph.Triple
-import eu.slipo.algorithms.{Distances, PIC, oneHotEncoder}
+import eu.slipo.algorithms.{Distances, PIC, multiDS, oneHotEncoder, Kmeans}
 import eu.slipo.datatypes.Cluster
 import eu.slipo.datatypes.Clusters
 import eu.slipo.datatypes.Coordinate
@@ -31,10 +31,12 @@ object poiClustering {
     val categoriesFile = "src/main/results/categories"
     val pic_results = "src/main/resources/results/pic_clusters.json"
     val kmeans_results = "src/main/resources/results/kmeans_clusters.json"
+    val mds_kmeans_results = "src/main/resources/results/mds_kmeans_clusters.json"
     val poiCategoriesFile = "src/main/resources/results/poi_categories"
     val runTimeStatics = "src/main/resources/results/runtime.txt"
     val picFileWriter = new PrintWriter(pic_results)
     val kmeansFileWriter = new PrintWriter(kmeans_results)
+    val mdsKMFileWriter = new PrintWriter(mds_kmeans_results)
         
     /*
      * get (category_id, category_values_set)
@@ -152,25 +154,25 @@ object poiClustering {
       // from ((sid, ()), (did, ())) to (sid, did, similarity)
       val pairwisePOISimilarity = pairwisePOICategorySet.map(x => (x._1._1.toLong, x._2._1.toLong,
                                                                   new Distances().jaccardSimilarity(x._1._2, x._2._2))).persist()
-      // pic clustering, 3 centroids and 1 iterations
+      // pic clustering
       val clustersPIC = new PIC().picSparkML(pairwisePOISimilarity, 15, 5, spark)
       writeClusteringResult(clustersPIC, pois, picFileWriter)
 
       // distance RDD, from (sid, did, similarity) to (sid, did, distance)
-      // val distancePairs = pairwisePOISimilarity.map(x => (x._1, x._2, 1.0 - x._3))
+      val distancePairs = pairwisePOISimilarity.map(x => (x._1, x._2, 1.0 - x._3)).persist()
       
-      // generate coordindates in 2 dimension
-      // val coordinates = new multiDS().multiDimensionScaling(distancePairs, numberPOIs, 2).map(x => (x(0), x(1)))
-     
-      // kmeans clustering, number of clusters 2
-      //println(kmeansClustering(coordinates, spark, 2))
-      
+      // generate coordindates in 2 dimension, and run kmeans
+      val poi2Coordinates = new multiDS().multiDimensionScaling(distancePairs, poiCategorySetVinna.count().toInt, 2)
+      val clustersMDSKM = new Kmeans().kmeansClustering(poi2Coordinates, 2, spark)
+      writeClusteringResult(clustersKM, pois, mdsKMFileWriter)
+
       // dbscan clustering, TODO solve scala version flicts with SANSA
       // dbscanClustering(coordinates, spark)
 
       // stop spark session
       picFileWriter.close()
       kmeansFileWriter.close()
+      mdsKMFileWriter.close()
       spark.stop()
     }
 }
