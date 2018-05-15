@@ -6,13 +6,12 @@ import net.sansa_stack.rdf.spark.io.NTripleReader
 import org.apache.spark.rdd._
 import org.apache.spark.sql._
 import org.apache.jena.graph.Triple
-import eu.slipo.algorithms.{Distances, PIC, multiDS, Encoder, Kmeans}
+import eu.slipo.algorithms.{Distances, PIC, Encoder, Kmeans}
 import eu.slipo.datatypes.Cluster
 import eu.slipo.datatypes.Clusters
 import eu.slipo.datatypes.Coordinate
 import eu.slipo.datatypes.Poi
 import eu.slipo.datatypes.Categories
-import org.apache.spark.ml.clustering.KMeans
 import org.json4s._
 import org.json4s.jackson.Serialization
 
@@ -20,7 +19,7 @@ import org.json4s.jackson.Serialization
 
 object poiClustering {
     // there are 312385 pois for tomtom and 350053 for herold
-    val dataSource = "src/main/resources/data/tomtom_pois_austria_v0.3.nt"
+    val dataSource = "src/main/resources/data/herold_pois_austria_v0.3.nt"
     val termValueUri = "http://slipo.eu/def#termValue"
     val termPrefix = "http://slipo.eu/id/term/" 
     val typePOI = "http://slipo.eu/def#POI"

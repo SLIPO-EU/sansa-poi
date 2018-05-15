@@ -1,225 +1,249 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-  <modelVersion>4.0.0</modelVersion>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
 
-  <groupId>eu.slipo</groupId>
-  <artifactId>poi</artifactId>
-  <version>0.0.1-SNAPSHOT</version>
-  <packaging>jar</packaging>
+<modelVersion>4.0.0</modelVersion>
+<groupId>de.fraunhofer.eis</groupId>
+<artifactId>slipo</artifactId>
+<version>0.0.1-SNAPSHOT</version>
+<packaging>jar</packaging>
+<name>poi</name>
+<url>http://maven.apache.org</url>
 
-  <name>poi</name>
-  <url>http://maven.apache.org</url>
-
-  <properties>
-  	<toolsjar>lib/*.jar</toolsjar>
+<properties>
+    <toolsjar>lib/*.jar</toolsjar>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-	<maven.compiler.source>1.8</maven.compiler.source>
-	<maven.compiler.target>1.8</maven.compiler.target>
-	<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-	<scala.version>2.11.11</scala.version>
-	<scala.binary.version>2.11</scala.binary.version>
-	<spark.version>2.1.1</spark.version>
-	<flink.version>1.3.0</flink.version>
-	<jena.version>3.5.0</jena.version>
-	<sansa.version>0.3.1-SNAPSHOT</sansa.version>
-	  <src.dir>src/main/scala</src.dir>
-	  <output.dir>target/classes</output.dir>
-  </properties>
+    <maven.compiler.source>1.8</maven.compiler.source>
+    <maven.compiler.target>1.8</maven.compiler.target>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <scala.version>2.11.11</scala.version>
+    <scala.binary.version>2.11</scala.binary.version>
+    <spark.version>2.1.1</spark.version>
+    <flink.version>1.3.0</flink.version>
+    <jena.version>3.5.0</jena.version>
+    <sansa.version>0.3.1-SNAPSHOT</sansa.version>
+    <src.dir>src/main/scala</src.dir>
+    <output.dir>target/classes</output.dir>
+</properties>
 
-  <build>
-    <sourceDirectory>${src.dir}</sourceDirectory>
-    <outputDirectory>${output.dir}</outputDirectory>
-  </build>
+<profiles>
+    <profile>
+        <id>dev</id>
+        <build>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-antrun-plugin</artifactId>
+                    <version>1.1</version>
+                    <executions>
+                        <execution>
+                            <id>id.compile</id>
+                            <phase>compile</phase>
+                            <goals>
+                                <goal>run</goal>
+                            </goals>
+                            <configuration>
+                                <tasks>
+                                    <echo>Project Compiled Successfully!</echo>
+                                </tasks>
+                            </configuration>
+                        </execution>
+                    </executions>
+                </plugin>
+            </plugins>
+        </build>
+    </profile>
+</profiles>
 
-  <dependencies>
-  
- 	<!-- Scala -->
-	<dependency>
-		<groupId>org.scala-lang</groupId>
-		<artifactId>scala-library</artifactId>
-		<version>${scala.version}</version>
-	</dependency>
+<dependencies>
 
-	<!-- Apache Spark Core -->
-	<dependency>
-		<groupId>org.apache.spark</groupId>
-		<artifactId>spark-core_${scala.binary.version}</artifactId>
-		<version>${spark.version}</version>
-	</dependency>
-	
-	<!-- Apache Spark SQL -->
-	<dependency>
-		<groupId>org.apache.spark</groupId>
-		<artifactId>spark-sql_${scala.binary.version}</artifactId>
-		<version>${spark.version}</version>
-	</dependency>
-	<!-- Apache Spark ML -->
-	<dependency>
-		<groupId>org.apache.spark</groupId>
-		<artifactId>spark-mllib_${scala.binary.version}</artifactId>
-		<version>${spark.version}</version>
-	</dependency>
+<!-- Scala -->
+<dependency>
+    <groupId>org.scala-lang</groupId>
+    <artifactId>scala-library</artifactId>
+    <version>${scala.version}</version>
+</dependency>
 
-	<!-- Apache JENA 3.x -->
-	<dependency>
-		<groupId>org.apache.jena</groupId>
-		<artifactId>apache-jena-libs</artifactId>
-		<type>pom</type>
-		<version>${jena.version}</version>
-	</dependency>
-	
-	<!-- Logging -->
-	<dependency>
-		<groupId>com.typesafe.scala-logging</groupId>
-		<artifactId>scala-logging_${scala.binary.version}</artifactId>
-		<version>3.5.0</version>
-	</dependency>
-	
-	<!-- Scopt -->
-	<dependency>
-		<groupId>com.github.scopt</groupId>
-		<artifactId>scopt_${scala.binary.version}</artifactId>
-		<version>3.5.0</version>
-	</dependency>
+<!-- Apache Spark Core -->
+<dependency>
+    <groupId>org.apache.spark</groupId>
+    <artifactId>spark-core_${scala.binary.version}</artifactId>
+    <version>${spark.version}</version>
+</dependency>
 
-	<!-- Guava -->
-	<dependency>
-		<groupId>com.google.guava</groupId>
-		<artifactId>guava</artifactId>
-		<version>19.0</version>
-	</dependency>
-	
-	<!-- SANSA RDF -->
-	<dependency>
-			<groupId>net.sansa-stack</groupId>
-			<artifactId>sansa-rdf-spark-bundle_${scala.binary.version}</artifactId>
-			<version>${sansa.version}</version>
-	</dependency>
-	
-	<!-- SANSA OWL -->
-	<dependency>
-			<groupId>net.sansa-stack</groupId>
-			<artifactId>sansa-owl-spark_${scala.binary.version}</artifactId>
-			<version>${sansa.version}</version>
-	</dependency>
-	
-	<!-- SANSA Inference -->
-	<dependency>
-		<groupId>net.sansa-stack</groupId>
-		<artifactId>sansa-inference-spark_${scala.binary.version}</artifactId>
-		<version>${sansa.version}</version>
-	</dependency>
+<!-- Apache Spark SQL -->
+<dependency>
+    <groupId>org.apache.spark</groupId>
+    <artifactId>spark-sql_${scala.binary.version}</artifactId>
+    <version>${spark.version}</version>
+</dependency>
+<!-- Apache Spark ML -->
+<dependency>
+    <groupId>org.apache.spark</groupId>
+    <artifactId>spark-mllib_${scala.binary.version}</artifactId>
+    <version>${spark.version}</version>
+</dependency>
 
-	<!-- SANSA Querying -->
-	<dependency>
-		<groupId>net.sansa-stack</groupId>
-		<artifactId>sansa-query-spark-bundle_${scala.binary.version}</artifactId>
-		<version>${sansa.version}</version>
-	</dependency>
+<!-- Apache JENA 3.x -->
+<dependency>
+    <groupId>org.apache.jena</groupId>
+    <artifactId>apache-jena-libs</artifactId>
+    <type>pom</type>
+    <version>${jena.version}</version>
+</dependency>
 
-	<!-- SANSA ML -->
-	<dependency>
-		<groupId>net.sansa-stack</groupId>
-		<artifactId>sansa-ml-spark_${scala.binary.version}</artifactId>
-		<version>${sansa.version}</version>
-	</dependency>
-	
-	<!-- DBScan -->
-	<dependency>
-	    <groupId>dbscan</groupId>
-	    <artifactId>dbscan</artifactId>
-	    <version>1.0</version>
-	    <scope>system</scope>
-	    <systemPath>${project.basedir}/lib/dbscan-on-spark_2.10-0.2.0-SNAPSHOT.jar</systemPath>
-	</dependency>
-	
-	<!-- Test -->
-    <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <version>3.8.1</version>
-      <scope>test</scope>
-    </dependency>
-    
-    <dependency>
-		<groupId>org.scalatest</groupId>
-		<artifactId>scalatest_${scala.binary.version}</artifactId>
-		<version>2.2.6</version>
-		<scope>test</scope>
-	</dependency>
-	
-	<!-- Multi-dimensional scaling -->
-	<dependency>
-      <groupId>com.github.haifengl</groupId>
-      <artifactId>smile-core</artifactId>
-      <version>1.5.0</version>
-    </dependency>
-    
-    <dependency>
-      <groupId>com.github.haifengl</groupId>
-      <artifactId>smile-netlib</artifactId>
-      <version>1.5.0</version>
-    </dependency>
+<!-- Logging -->
+<dependency>
+    <groupId>com.typesafe.scala-logging</groupId>
+    <artifactId>scala-logging_${scala.binary.version}</artifactId>
+    <version>3.5.0</version>
+</dependency>
 
-      <dependency>
-          <groupId>org.json4s</groupId>
-          <artifactId>json4s-native_2.12</artifactId>
-          <version>3.5.3</version>
-      </dependency>
+<!-- Scopt -->
+<dependency>
+    <groupId>com.github.scopt</groupId>
+    <artifactId>scopt_${scala.binary.version}</artifactId>
+    <version>3.5.0</version>
+</dependency>
 
-      <dependency>
-          <groupId>org.json4s</groupId>
-          <artifactId>json4s-jackson_2.12</artifactId>
-          <version>3.5.3</version>
-      </dependency>
+<!-- Guava -->
+<dependency>
+    <groupId>com.google.guava</groupId>
+    <artifactId>guava</artifactId>
+    <version>19.0</version>
+</dependency>
 
+<!-- SANSA RDF -->
+<dependency>
+        <groupId>net.sansa-stack</groupId>
+        <artifactId>sansa-rdf-spark-bundle_${scala.binary.version}</artifactId>
+        <version>${sansa.version}</version>
+</dependency>
 
-  </dependencies>
-  
-  <repositories>
-		<repository>
-			<id>oss-sonatype</id>
-			<name>oss-sonatype</name>
-			<url>https://oss.sonatype.org/content/repositories/snapshots/</url>
-			<snapshots>
-				<enabled>true</enabled>
-			</snapshots>
-		</repository>
-		<repository>
-			<id>apache-snapshot</id>
-			<name>Apache repository (snapshots)</name>
-			<url>https://repository.apache.org/content/repositories/snapshots/</url>
-			<snapshots>
-				<enabled>true</enabled>
-			</snapshots>
-		</repository>
-		<repository>
-			<id>maven.aksw.internal</id>
-			<name>AKSW Release Repository</name>
-			<url>http://maven.aksw.org/archiva/repository/internal</url>
-			<releases>
-				<enabled>true</enabled>
-			</releases>
-			<snapshots>
-				<enabled>false</enabled>
-			</snapshots>
-		</repository>
-		<repository>
-			<id>maven.aksw.snapshots</id>
-			<name>AKSW Snapshot Repository</name>
-			<url>http://maven.aksw.org/archiva/repository/snapshots</url>
-			<releases>
-				<enabled>false</enabled>
-			</releases>
-			<snapshots>
-				<enabled>true</enabled>
-			</snapshots>
-		</repository>
-		<repository>
-			<id>dbscan-on-spark-repo</id>
-			<name>Repo for DBSCAN on Spark</name>
-			<url>http://dl.bintray.com/irvingc/maven</url>
-		</repository>
-	</repositories>
+<!-- SANSA OWL -->
+<dependency>
+        <groupId>net.sansa-stack</groupId>
+        <artifactId>sansa-owl-spark_${scala.binary.version}</artifactId>
+        <version>${sansa.version}</version>
+</dependency>
+
+<!-- SANSA Inference -->
+<dependency>
+    <groupId>net.sansa-stack</groupId>
+    <artifactId>sansa-inference-spark_${scala.binary.version}</artifactId>
+    <version>${sansa.version}</version>
+</dependency>
+
+<!-- SANSA Querying -->
+<dependency>
+    <groupId>net.sansa-stack</groupId>
+    <artifactId>sansa-query-spark-bundle_${scala.binary.version}</artifactId>
+    <version>${sansa.version}</version>
+</dependency>
+
+<!-- SANSA ML -->
+<dependency>
+    <groupId>net.sansa-stack</groupId>
+    <artifactId>sansa-ml-spark_${scala.binary.version}</artifactId>
+    <version>${sansa.version}</version>
+</dependency>
+
+<!-- DBScan -->
+<dependency>
+    <groupId>dbscan</groupId>
+    <artifactId>dbscan</artifactId>
+    <version>1.0</version>
+    <scope>system</scope>
+    <systemPath>${project.basedir}/lib/dbscan-on-spark_2.10-0.2.0-SNAPSHOT.jar</systemPath>
+</dependency>
+
+<!-- Test -->
+<dependency>
+  <groupId>junit</groupId>
+  <artifactId>junit</artifactId>
+  <version>3.8.1</version>
+  <scope>test</scope>
+</dependency>
+
+<dependency>
+    <groupId>org.scalatest</groupId>
+    <artifactId>scalatest_${scala.binary.version}</artifactId>
+    <version>2.2.6</version>
+    <scope>test</scope>
+</dependency>
+
+<!-- Multi-dimensional scaling -->
+<dependency>
+  <groupId>com.github.haifengl</groupId>
+  <artifactId>smile-core</artifactId>
+  <version>1.5.0</version>
+</dependency>
+
+<dependency>
+  <groupId>com.github.haifengl</groupId>
+  <artifactId>smile-netlib</artifactId>
+  <version>1.5.0</version>
+</dependency>
+
+<dependency>
+  <groupId>org.json4s</groupId>
+  <artifactId>json4s-native_2.12</artifactId>
+  <version>3.5.3</version>
+</dependency>
+
+<dependency>
+  <groupId>org.json4s</groupId>
+  <artifactId>json4s-jackson_2.12</artifactId>
+  <version>3.5.3</version>
+</dependency>
+
+</dependencies>
+
+<repositories>
+    <repository>
+        <id>oss-sonatype</id>
+        <name>oss-sonatype</name>
+        <url>https://oss.sonatype.org/content/repositories/snapshots/</url>
+        <snapshots>
+            <enabled>true</enabled>
+        </snapshots>
+    </repository>
+    <repository>
+        <id>apache-snapshot</id>
+        <name>Apache repository (snapshots)</name>
+        <url>https://repository.apache.org/content/repositories/snapshots/</url>
+        <snapshots>
+            <enabled>true</enabled>
+        </snapshots>
+    </repository>
+    <repository>
+        <id>maven.aksw.internal</id>
+        <name>AKSW Release Repository</name>
+        <url>http://maven.aksw.org/archiva/repository/internal</url>
+        <releases>
+            <enabled>true</enabled>
+        </releases>
+        <snapshots>
+            <enabled>false</enabled>
+        </snapshots>
+    </repository>
+    <repository>
+        <id>maven.aksw.snapshots</id>
+        <name>AKSW Snapshot Repository</name>
+        <url>http://maven.aksw.org/archiva/repository/snapshots</url>
+        <releases>
+            <enabled>false</enabled>
+        </releases>
+        <snapshots>
+            <enabled>true</enabled>
+        </snapshots>
+    </repository>
+    <repository>
+        <id>dbscan-on-spark-repo</id>
+        <name>Repo for DBSCAN on Spark</name>
+        <url>http://dl.bintray.com/irvingc/maven</url>
+    </repository>
+</repositories>
 
 </project>
