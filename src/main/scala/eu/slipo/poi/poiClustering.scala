@@ -19,7 +19,7 @@ import org.json4s.jackson.Serialization
 
 object poiClustering {
     // there are 312385 pois for tomtom and 350053 for herold
-    val dataSource = "src/main/resources/data/herold_pois_austria_v0.3.nt"
+    val dataSource = "data/herold_pois_austria_v0.3.nt"
     val termValueUri = "http://slipo.eu/def#termValue"
     val termPrefix = "http://slipo.eu/id/term/" 
     val typePOI = "http://slipo.eu/def#POI"
@@ -27,17 +27,10 @@ object poiClustering {
     val categoryPOI = "http://slipo.eu/def#category"
     val termPOI = "http://slipo.eu/def#termValue"
     val poiPrefix = "http://slipo.eu/id/poi/"
-    val categoriesFile = "src/main/results/categories"
-    val pic_results = "src/main/resources/results/pic_clusters.json"
-    val oneHot_kmeans_results = "src/main/resources/results/oneHot_kmeans_clusters.json"
-    val mds_kmeans_results = "src/main/resources/results/mds_kmeans_clusters.json"
-    val word_2_VecKMFile = "src/main/resources/results/word2vec_kmeans_clusters.json"
-    val poiCategoriesFile = "src/main/resources/results/poi_categories"
-    val runTimeStatics = "src/main/resources/results/runtime.txt"
-    val picFileWriter = new PrintWriter(pic_results)
-    val oneHotKMFileWriter = new PrintWriter(oneHot_kmeans_results)
-    val mdsKMFileWriter = new PrintWriter(mds_kmeans_results)
-    val word2VecKMFileWriter = new PrintWriter(word_2_VecKMFile)
+    val picFileWriter = new PrintWriter("results/pic_clusters.json")
+    val oneHotKMFileWriter = new PrintWriter("results/oneHot_kmeans_clusters.json")
+    val mdsKMFileWriter = new PrintWriter("results/mds_kmeans_clusters.json")
+    val word2VecKMFileWriter = new PrintWriter("results/word2vec_kmeans_clusters.json")
         
     /*
      * get (category_id, category_values_set)
@@ -92,7 +85,7 @@ object poiClustering {
       val spark = SparkSession.builder
                   .master("local[*]")
                   .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
-                  .appName("Triple reader resources/data/tomtom_pois_austria_v0.3.nt")
+                  .appName("Triple reader data/tomtom_pois_austria_v0.3.nt")
                   .getOrCreate()
       spark.conf.set("spark.executor.memory", "10g")
       spark.conf.set("spark.driver.memory", "10g")
