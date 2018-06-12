@@ -2,7 +2,10 @@ package eu.slipo.poi
 
 import java.io.PrintWriter
 
+import scala.collection.mutable.ArrayBuffer
 import net.sansa_stack.rdf.spark.io.NTripleReader
+import net.sansa_stack.query.spark.sparqlify.{ QueryExecutionFactorySparqlifySpark, QueryExecutionUtilsSpark, QueryExecutionSpark, SparqlifyUtils3 }
+import org.apache.spark.SparkContext
 import org.apache.spark.rdd._
 import org.apache.spark.sql._
 import org.apache.jena.graph.Triple
@@ -19,7 +22,7 @@ import org.json4s.jackson.Serialization
 
 object poiClustering {
     // there are 312385 pois for tomtom and 350053 for herold
-    val dataSource = "data/herold_pois_austria_v0.3.nt"
+    val dataSource = "data/tomtom_pois_austria_v0.3.nt"
     val termValueUri = "http://slipo.eu/def#termValue"
     val termPrefix = "http://slipo.eu/id/term/" 
     val typePOI = "http://slipo.eu/def#POI"
@@ -27,6 +30,8 @@ object poiClustering {
     val categoryPOI = "http://slipo.eu/def#category"
     val termPOI = "http://slipo.eu/def#termValue"
     val poiPrefix = "http://slipo.eu/id/poi/"
+    val viennaTriplesWriter = new PrintWriter("results/vienna.nt")
+    val profileWriter = new PrintWriter("results/profile.txt")
     val picFileWriter = new PrintWriter("results/pic_clusters.json")
     val oneHotKMFileWriter = new PrintWriter("results/oneHot_kmeans_clusters.json")
     val mdsKMFileWriter = new PrintWriter("results/mds_kmeans_clusters.json")
@@ -45,13 +50,18 @@ object poiClustering {
       categoriesIdValues.groupByKey().map(x => (x._1, Categories(scala.collection.mutable.Set(x._2.toList:_*))))
     }
     
+    def join(sparkContext: SparkContext, ids: Array[Long], pairs: RDD[(Long, Poi)]): Array[Poi] = {
+      val idsPair = sparkContext.parallelize(ids).map(x => (x, x))
+      idsPair.join(pairs).map(x => x._2._2).collect()
+    }
+    
     /*
      * Write clustering results to file
      * */
-    def writeClusteringResult(clusters: Map[Int, Array[Long]], pois: RDD[Poi], fileWriter: PrintWriter): Unit = {
+    def writeClusteringResult(sparkContext: SparkContext, clusters: Map[Int, Array[Long]], pois: RDD[Poi], fileWriter: PrintWriter): Unit = {
       val assignments = clusters.toList.sortBy { case (k, v) => v.length }
-      val poisKeyPair = pois.keyBy(f => f.poi_id)
-      val clustersPois = Clusters(assignments.size, assignments.map(_._2.length).toArray, assignments.map(f => Cluster(f._1, f._2.map(x => poisKeyPair.lookup(x.toInt).head))))
+      val poisKeyPair = pois.keyBy(f => f.poi_id).persist()
+      val clustersPois = Clusters(assignments.size, assignments.map(_._2.length).toArray, assignments.map(f => Cluster(f._1, join(sparkContext, f._2, poisKeyPair))))
       implicit val formats = DefaultFormats
       Serialization.writePretty(clustersPois, fileWriter)
     }
@@ -79,19 +89,49 @@ object poiClustering {
                                   categories})).persist()
     }
     
+    def createSubjects(poiID: Long): ArrayBuffer[String] = {
+      val subjects = ArrayBuffer[String]()
+      val id = "http://slipo.eu/id/poi/".concat(poiID.toString())
+      subjects.+=(id)
+      subjects.+=(id.concat("/address"))
+      subjects.+=(id.concat("/phone"))
+      subjects.+=(id.concat("/geometry"))
+      subjects.+=(id.concat("/name"))
+      subjects.+=(id.concat("/accuracy_info"))
+      subjects.+=(id.concat("/brandname"))
+      subjects
+    }
+    
+    def getTriples(viennaKeys: Array[Long], writer: PrintWriter, dataRDD: RDD[Triple], spark: SparkSession){
+      val subjects = ArrayBuffer[String]()
+      for (i<-0 until viennaKeys.length-1){
+        subjects ++= createSubjects(i)
+      }
+      val dataRDDPair = dataRDD.map(f => (f.getSubject.getURI, f))
+      val subjectsRDD = spark.sparkContext.parallelize(subjects.toSet.toList).map(f => (f, f))
+      val viennaTriples = subjectsRDD.join(dataRDDPair).map(f => f._2._2)
+      viennaTriples.foreach(f => writer.println(f.getSubject.getURI + " " + f.getPredicate.getURI + " " + f.getObject.toString()))
+      val viennaCatgoriesObjects = viennaTriples.filter(f => f.getPredicate.getURI.equals("http://slipo.eu/def#category")).map(f => f.getObject.getURI).distinct()
+      val viennaPoiCategoriesRDD = viennaCatgoriesObjects.map(f => (f, f))
+      val viennaCategoryTriples = viennaPoiCategoriesRDD.join(dataRDDPair).map(f => f._2._2)
+      val temp = viennaCategoryTriples.map(f => (f.getSubject.getURI+f.getPredicate.getURI+f.getObject.toString(), f))
+      temp.reduceByKey((v1, v2) => v1).foreach(f => writer.println(f._2.getSubject.getURI + " " + f._2.getPredicate.getURI + " " + f._2.getObject.toString()))
+    }
     
     def main(args: Array[String]){
-      System.setProperty("hadoop.home.dir", "C:\\Hadoop")
+      // System.setProperty("hadoop.home.dir", "C:\\Hadoop") // for Windows system
       val spark = SparkSession.builder
                   .master("local[*]")
                   .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+                  .config("spark.executor.memory", "10g")
+                  .config("spark.driver.memory", "10g")
+                  .config("spark.driver.maxResultSize", "6g")
                   .appName("Triple reader data/tomtom_pois_austria_v0.3.nt")
                   .getOrCreate()
-      spark.conf.set("spark.executor.memory", "10g")
-      spark.conf.set("spark.driver.memory", "10g")
-
+      println(spark.sparkContext.getConf.getAll.mkString("\n"))
+      val t0 = System.nanoTime()
       // read NTriple file, get RDD contains triples
-      val dataRDD = NTripleReader.load(spark, dataSource)
+      val dataRDD = NTripleReader.load(spark, dataSource).persist()
       
       // get the coordinates of pois
       val pattern = "POINT(.+ .+)".r
@@ -104,66 +144,79 @@ object poiClustering {
       val poiCleanCoordinates = poiCoordinates.mapValues(x => {val coordinates = x.replace("(", "").replace(")", "").split(" ")
                                     Coordinate(coordinates(0).toDouble, coordinates(1).toDouble)})
       
-      // find pois in vinna, 72549 in total for herold, sample 0.1%
-      val poiVinna = poiCleanCoordinates.filter(x => (x._2.longitude>=16.192851 && x._2.longitude<=16.593533)
+      // find pois in Vienna 
+      val poiVienna = poiCleanCoordinates.filter(x => (x._2.longitude>=16.192851 && x._2.longitude<=16.593533)
                                                       && (x._2.latitude>=48.104194 && x._2.latitude<=48.316388)
-                                                ).sample(withReplacement = false, fraction = 0.002, seed = 0).persist()
-      val keys = poiVinna.keys.collect()
-      println(s"Number of sampled poi in Vinna: ${keys.length}")
-
-      // find all the categories of pois in Vinna
-      val poiFlatCategories = dataRDD.filter(x => x.getPredicate.toString().equalsIgnoreCase(categoryPOI))
-      val poiCategoriesVinna = poiFlatCategories.filter(x => keys.contains(x.getSubject.toString().replace(poiPrefix, "").toLong))
+                                                ).sample(withReplacement = false, fraction = 0.001, seed = 0).persist()
+      val viennaKeys = poiVienna.keys.collect()
+      
+      // writer POIs in Vienna to file
+      getTriples(viennaKeys, viennaTriplesWriter, dataRDD, spark)
+      // find all the categories of pois in Vienna
+      //val poiFlatCategories = dataRDD.filter(x => x.getPredicate.toString().equalsIgnoreCase(categoryPOI))
+      //val poiCategoriesVienna = poiFlatCategories.filter(x => keys.contains(x.getSubject.toString().replace(poiPrefix, "").toLong))
 
       // from 'Node' to (poi_id, category_id) pairs, possible with duplicated keys
-      val poiRawCategoriesVinna = poiCategoriesVinna.map(x => (x.getSubject.toString().replace(poiPrefix, "").toLong,
-                                                         x.getObject.toString().replace(termPrefix, "").toLong))
+      //val poiRawCategoriesVienna = poiCategoriesVienna.map(x => (x.getSubject.toString().replace(poiPrefix, "").toLong,
+       //                                                  x.getObject.toString().replace(termPrefix, "").toLong))
       
-      // get the categories for each poi in Vinna
-      val poiCategorySetVinna = poiRawCategoriesVinna.groupByKey().map(f => (f._1, f._2.toSet)).persist()
-      println(s"Number of sampled poi in Vinna, with categories: ${poiCategorySetVinna.count()}")
+      // get the categories for each poi in Vienna
+      //val poiCategorySetVienna = poiRawCategoriesVienna.groupByKey().map(f => (f._1, f._2.toSet)).persist()
+      //profileWriter.println(s"Number of sampled poi in Vienna, with categories: ${poiCategorySetVienna.count()}")
       // aggregate category values based on category id
-      val categoryIdValues = getCategoryValues(spark, dataRDD).persist()
-      println(s"Number of categories: ${categoryIdValues.count()}")
-      val poiVinnaCategoryIds = poiCategorySetVinna.flatMap(f => f._2).collect().toSet
-      println(s"Number of categories in Vinna: ${poiVinnaCategoryIds.size}")
-      val categoryVinnaIdValues = categoryIdValues.filter(f => poiVinnaCategoryIds.contains(f._1)).persist()
-      println(s"Number of categories with value in Vinna: ${categoryVinnaIdValues.count()}")
-      val pois = generatePois(spark, poiVinna, categoryVinnaIdValues, poiCategorySetVinna).persist()
-      println(s"number of poi: ${pois.count()}")
+      //val categoryIdValues = getCategoryValues(spark, dataRDD).persist()
+      //profileWriter.println(s"Number of categories: ${categoryIdValues.count()}")
+      //val poiViennaCategoryIds = poiCategorySetVienna.flatMap(f => f._2).collect().toSet
+      //profileWriter.println(s"Number of categories in Vienna: ${poiViennaCategoryIds.size}")
+      //val categoryViennaIdValues = categoryIdValues.filter(f => poiViennaCategoryIds.contains(f._1)).persist()
+      //profileWriter.println(s"Number of categories with value in Vienna: ${categoryViennaIdValues.count()}")
+      //val pois = generatePois(spark, poiVienna, categoryViennaIdValues, poiCategorySetVienna).persist()
+      //profileWriter.println(s"number of poi: ${pois.count()}")
 
+      //val t1 = System.nanoTime()
+      //profileWriter.println("Elapsed time preparing data: " + (t1 - t0) + "ns")
+      
       // one hot encoding
-      val oneHotDF = new Encoder().oneHotEncoding(poiCategorySetVinna, spark)
-      val oneHotClusters = new Kmeans().kmClustering(numClusters = 10, df = oneHotDF, spark = spark)
-      writeClusteringResult(oneHotClusters, pois, oneHotKMFileWriter)
+      //val oneHotDF = new Encoder().oneHotEncoding(poiCategorySetVienna, spark)
+      //val oneHotClusters = new Kmeans().kmClustering(numClusters = 10, df = oneHotDF, spark = spark)
+      //writeClusteringResult(spark.sparkContext, oneHotClusters, pois, oneHotKMFileWriter)
+      //val t2 = System.nanoTime()
+      //profileWriter.println("Elapsed time one hot: " + (t2 - t0) + "ns")
 
-      // word2Vec encoding
-      val avgVectorDF = new Encoder().wordVectorEncoder(poiCategorySetVinna, spark)
-      val avgVectorClusters = new Kmeans().kmClustering(numClusters = 10, df = avgVectorDF, spark = spark)
-      writeClusteringResult(avgVectorClusters, pois, word2VecKMFileWriter)
+      //// word2Vec encoding
+      //val avgVectorDF = new Encoder().wordVectorEncoder(poiCategorySetVienna, spark)
+      //val avgVectorClusters = new Kmeans().kmClustering(numClusters = 10, df = avgVectorDF, spark = spark)
+      //writeClusteringResult(spark.sparkContext, avgVectorClusters, pois, word2VecKMFileWriter)
+      //val t3 = System.nanoTime()
+      //profileWriter.println("Elapsed time word2Vec: " + (t3 - t0) + "ns")
 
-      // pic clustering, build ((sid, ()), (did, ())) RDD
-      val pairwisePOICategorySet = poiCategorySetVinna.cartesian(poiCategorySetVinna).filter{ case (a, b) => a._1 < b._1 }
-      // from ((sid, ()), (did, ())) to (sid, did, similarity)
-      val pairwisePOISimilarity = pairwisePOICategorySet.map(x => (x._1._1.toLong, x._2._1.toLong,
-                                                                  new Distances().jaccardSimilarity(x._1._2, x._2._2))).persist()
-      val clustersPIC = new PIC().picSparkML(pairwisePOISimilarity, 10, 5, spark)
-      writeClusteringResult(clustersPIC, pois, picFileWriter)
+      //// pic clustering, build ((sid, ()), (did, ())) RDD
+      //val pairwisePOICategorySet = poiCategorySetVienna.cartesian(poiCategorySetVienna).filter{ case (a, b) => a._1 < b._1 }
+      //// from ((sid, ()), (did, ())) to (sid, did, similarity)
+      //val pairwisePOISimilarity = pairwisePOICategorySet.map(x => (x._1._1.toLong, x._2._1.toLong,
+      //                                                           new Distances().jaccardSimilarity(x._1._2, x._2._2))).persist()
+      //val clustersPIC = new PIC().picSparkML(pairwisePOISimilarity, 10, 5, spark)
+      //writeClusteringResult(spark.sparkContext, clustersPIC, pois, picFileWriter)
+      //val t4 = System.nanoTime()
+      //profileWriter.println("Elapsed time cartesian: " + (t4 - t0) + "ns")
 
-      // distance RDD, from (sid, did, similarity) to (sid, did, distance)
-      val distancePairs = pairwisePOISimilarity.map(x => (x._1, x._2, 1.0 - x._3)).persist()
-      val mdsDF = new Encoder().mdsEncoding(distancePairs = distancePairs, poiCategorySetVinna.count().toInt, dimension = 2, spark = spark)
-      val mdsClusters = new Kmeans().kmClustering(numClusters = 10, df = mdsDF, spark = spark)
-      writeClusteringResult(mdsClusters, pois, mdsKMFileWriter)
+      //// distance RDD, from (sid, did, similarity) to (sid, did, distance)
+      //val distancePairs = pairwisePOISimilarity.map(x => (x._1, x._2, 1.0 - x._3)).persist()
+      //val mdsDF = new Encoder().mdsEncoding(distancePairs = distancePairs, poiCategorySetVienna.count().toInt, dimension = 2, spark = spark)
+      //val mdsClusters = new Kmeans().kmClustering(numClusters = 10, df = mdsDF, spark = spark)
+      //writeClusteringResult(spark.sparkContext, mdsClusters, pois, mdsKMFileWriter)
+      //val t5 = System.nanoTime()
+      //profileWriter.println("Elapsed time mds: " + (t5 - t0) + "ns")
 
       // dbscan clustering, TODO solve scala version flicts with SANSA
       // dbscanClustering(coordinates, spark)
-
       // stop spark session
+      viennaTriplesWriter.close()
       picFileWriter.close()
       oneHotKMFileWriter.close()
       mdsKMFileWriter.close()
       word2VecKMFileWriter.close()
+      profileWriter.close()
       spark.stop()
     }
 }
