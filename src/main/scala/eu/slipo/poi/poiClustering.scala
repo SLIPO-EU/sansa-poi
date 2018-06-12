@@ -102,20 +102,20 @@ object poiClustering {
       subjects
     }
     
-    def getTriples(viennaKeys: Array[Long], writer: PrintWriter, dataRDD: RDD[Triple], spark: SparkSession){
+    def getTriples(viennaKeys: Array[Long],dataRDD: RDD[Triple], spark: SparkSession){
       val subjects = ArrayBuffer[String]()
       for (i<-0 until viennaKeys.length-1){
         subjects ++= createSubjects(i)
       }
-      val dataRDDPair = dataRDD.map(f => (f.getSubject.getURI, f))
-      val subjectsRDD = spark.sparkContext.parallelize(subjects.toSet.toList).map(f => (f, f))
+      val dataRDDPair = dataRDD.map(f => (f.getSubject.getURI, f)).persist()
+      val subjectsRDD = spark.sparkContext.parallelize(subjects.toSet.toList).map(f => (f, f)).persist()
       val viennaTriples = subjectsRDD.join(dataRDDPair).map(f => f._2._2)
-      viennaTriples.foreach(f => writer.println(f.getSubject.getURI + " " + f.getPredicate.getURI + " " + f.getObject.toString()))
+      viennaTriples.foreach(f => viennaTriplesWriter.println(f.getSubject.getURI + " " + f.getPredicate.getURI + " " + f.getObject.toString()))
       val viennaCatgoriesObjects = viennaTriples.filter(f => f.getPredicate.getURI.equals("http://slipo.eu/def#category")).map(f => f.getObject.getURI).distinct()
       val viennaPoiCategoriesRDD = viennaCatgoriesObjects.map(f => (f, f))
       val viennaCategoryTriples = viennaPoiCategoriesRDD.join(dataRDDPair).map(f => f._2._2)
       val temp = viennaCategoryTriples.map(f => (f.getSubject.getURI+f.getPredicate.getURI+f.getObject.toString(), f))
-      temp.reduceByKey((v1, v2) => v1).foreach(f => writer.println(f._2.getSubject.getURI + " " + f._2.getPredicate.getURI + " " + f._2.getObject.toString()))
+      temp.reduceByKey((v1, v2) => v1).foreach(f => viennaTriplesWriter.println(f._2.getSubject.getURI + " " + f._2.getPredicate.getURI + " " + f._2.getObject.toString()))
     }
     
     def main(args: Array[String]){
@@ -151,7 +151,7 @@ object poiClustering {
       val viennaKeys = poiVienna.keys.collect()
       
       // writer POIs in Vienna to file
-      getTriples(viennaKeys, viennaTriplesWriter, dataRDD, spark)
+      getTriples(viennaKeys, dataRDD, spark)
       // find all the categories of pois in Vienna
       //val poiFlatCategories = dataRDD.filter(x => x.getPredicate.toString().equalsIgnoreCase(categoryPOI))
       //val poiCategoriesVienna = poiFlatCategories.filter(x => keys.contains(x.getSubject.toString().replace(poiPrefix, "").toLong))
