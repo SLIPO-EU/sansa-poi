@@ -86,9 +86,9 @@ object poiClustering {
    * Build a list of Poi objects
    *
    * @param sparkSession
-   * @poiCoordinates with pairs of poi id and it's coordinates
-   * @categoryIdValues category and it's corresponding values
-   * @poiCategoryIds poi and it's corresponding category ids
+   * @param poiCoordinates with pairs of poi id and it's coordinates
+   * @param categoryIdValues category and it's corresponding values
+   * @param poiCategoryIds poi and it's corresponding category ids
    * @return RDD with poi objects
    */
   def generatePois(sparkSession: SparkSession, poiCoordinates: RDD[(Long, Coordinate)],
