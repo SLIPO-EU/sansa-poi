@@ -2,7 +2,7 @@ package eu.slipo.datatypes
 
 /**
  * a cluster
- * 
+ *
  * @param cluster_id id of cluster
  * @param poi_in_cluster an array of pois in cluster
  */
