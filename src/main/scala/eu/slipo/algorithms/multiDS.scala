@@ -5,11 +5,15 @@ import smile.mds.MDS
 
 class multiDS {
     
-    /*
+    /**
      * Multi-dimensional scaling
-     * 
      * Generate n dimensional coordinates based on input similarity matrix
-     * */
+     * 
+     * @param distancePairs distance between pair of poi
+     * @param numPOIS number of poi
+     * @param dimension dimension of generated coordinates
+     * @return poi id and coordinates in given dimension
+     */
     def multiDimensionScaling(distancePairs: RDD[(Long, Long, Double)], numPOIS: Int, dimension: Int): Array[(Long, Double, Double)] = {
       // vector keep recorded poi
       var vector = Array.ofDim[Long](numPOIS)

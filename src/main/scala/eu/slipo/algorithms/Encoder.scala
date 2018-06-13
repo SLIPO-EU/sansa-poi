@@ -8,9 +8,13 @@ import org.apache.spark.ml.feature.{VectorAssembler, Word2Vec}
 
 class Encoder {
   
-  /*
+    /**
      * One hot encoding categorical data
-     * */
+     * 
+     * @param poiCategories, category ids with corresponding category values
+     * @param spark
+     * @return one hot encoded DataFrame for each poi
+     */
     def oneHotEncoding(poiCategories: RDD[(Long, Set[Long])], spark: SparkSession): DataFrame = {
       // create a set to contain all categories
       var set = scala.collection.mutable.Set[Long]()
@@ -37,7 +41,6 @@ class Encoder {
           i += 1
         }
       )
-
       // vector keep all StructField
       val fields = Array.ofDim[StructField](categoryArray.length + 1)
       val featureColumns = Array.ofDim[String](categoryArray.length + 1)
@@ -55,6 +58,13 @@ class Encoder {
       transformedDf
     }
 
+    /**
+     * word2Vec encoding
+     * 
+     * @param poiCategories category ids with corresponding category values
+     * @param spark
+     * @return word2Vec encoded categories for each poi in DataFrame
+     */
     def wordVectorEncoder(poiCategories: RDD[(Long, Set[Long])], spark: SparkSession): DataFrame ={
       val word2vec = new Word2Vec().setInputCol("inputCol").setMinCount(1)
       val schema = StructType(StructField("inputCol", ArrayType(StringType, true), true) :: Nil)
@@ -66,7 +76,6 @@ class Encoder {
       val poiVector = poiCategoryVectors.map(f => (f._1, f._2.size, f._2.toArray.toList.transpose.map(_.sum).toArray))
       val leng = poiVector.take(1)(0)._2
       val poiAvgVector = poiVector.map(x => (x._1.toInt, x._3.map(y => y/x._2)))
-
       val fields = Array.ofDim[StructField](leng + 1)
       val featureColumns = Array.ofDim[String](leng + 1)
       // keep other columns with integer type
@@ -83,6 +92,15 @@ class Encoder {
       transformedDf
     }
 
+    /**
+     * multiple dimensional encoding
+     * 
+     * @param distancePairs distance between pair of pois
+     * @param numPOIS number of pois
+     * @param dimension mapped coordinate dimension
+     * @param spark
+     * @return encoded coordinates for each poi in DataFrame
+     */
     def mdsEncoding(distancePairs: RDD[(Long, Long, Double)], numPOIS: Int, dimension: Int, spark: SparkSession): DataFrame ={
       val poi2Coordinates = new multiDS().multiDimensionScaling(distancePairs, numPOIS, dimension)
       val poi2Coordinates2 = poi2Coordinates.map(x => (x._1.toInt, x._2, x._3))
