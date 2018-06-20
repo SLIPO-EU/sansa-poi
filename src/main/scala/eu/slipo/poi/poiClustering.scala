@@ -149,6 +149,19 @@ object poiClustering {
   }
 
   /**
+   * @param poiCoordinates
+   * @param lo_min
+   * @param lo_max
+   * @param la_min
+   * @param la_max
+   * @return pois within certain coordinates  
+   */
+  def filterCoordinates(poiCoordinates: RDD[(Long, Coordinate)], lo_min: Double, lo_max: Double, la_min: Double, la_max: Double): RDD[(Long, Coordinate)] = {
+    poiCoordinates.filter(x => (x._2.longitude >= lo_min && x._2.longitude <= lo_max)
+      && (x._2.latitude >= la_min && x._2.latitude <= la_max)).sample(withReplacement = false, fraction = 0.001, seed = 0).persist()
+  }
+  
+  /**
    * main function
    */
   def main(args: Array[String]) {
@@ -180,9 +193,9 @@ object poiClustering {
     })
 
     // find pois in Vienna
-    val poiVienna = poiCleanCoordinates.filter(x => (x._2.longitude >= 16.192851 && x._2.longitude <= 16.593533)
-      && (x._2.latitude >= 48.104194 && x._2.latitude <= 48.316388)).sample(withReplacement = false, fraction = 0.001, seed = 0).persist()
-    val keys = poiVienna.keys.collect()
+    //val poiVienna = filterCoordinates(poiCleanCoordinates, 16.192851, 16.593533, 48.104194, 48.316388)
+    //val keys = poiVienna.keys.collect()
+    val keys = poiCleanCoordinates.keys.collect()
 
     // writer POIs in Vienna to file
     //getTriples(keys, dataRDD, spark)
@@ -205,7 +218,7 @@ object poiClustering {
     profileWriter.println(s"Number of categories in Vienna: ${poiViennaCategoryIds.size}")
     val categoryViennaIdValues = categoryIdValues.filter(f => poiViennaCategoryIds.contains(f._1)).persist()
     profileWriter.println(s"Number of categories with value in Vienna: ${categoryViennaIdValues.count()}")
-    val pois = generatePois(spark, poiVienna, categoryViennaIdValues, poiCategorySetVienna).persist()
+    val pois = generatePois(spark, poiCleanCoordinates, categoryViennaIdValues, poiCategorySetVienna).persist()
     profileWriter.println(s"number of poi: ${pois.count()}")
 
     val t1 = System.nanoTime()
