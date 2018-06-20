@@ -4,7 +4,6 @@ import java.io.PrintWriter
 
 import scala.collection.mutable.ArrayBuffer
 import net.sansa_stack.rdf.spark.io.NTripleReader
-import net.sansa_stack.query.spark.sparqlify.{ QueryExecutionFactorySparqlifySpark, QueryExecutionUtilsSpark, QueryExecutionSpark, SparqlifyUtils3 }
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd._
 import org.apache.spark.sql._

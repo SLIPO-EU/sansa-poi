@@ -159,11 +159,13 @@
 </dependency>
 
 <!-- Apache Spark SQL -->
+<!--
 <dependency>
     <groupId>org.apache.spark</groupId>
     <artifactId>spark-sql_${scala.binary.version}</artifactId>
     <version>${spark.version}</version>
 </dependency>
+-->
 <!-- Apache Spark ML -->
 <dependency>
     <groupId>org.apache.spark</groupId>
@@ -208,25 +210,31 @@
 </dependency>
 
 <!-- SANSA OWL -->
+<!--
 <dependency>
         <groupId>net.sansa-stack</groupId>
         <artifactId>sansa-owl-spark_${scala.binary.version}</artifactId>
         <version>${sansa.version}</version>
 </dependency>
+-->
 
 <!-- SANSA Inference -->
+<!--
 <dependency>
     <groupId>net.sansa-stack</groupId>
     <artifactId>sansa-inference-spark_${scala.binary.version}</artifactId>
     <version>${sansa.version}</version>
 </dependency>
+-->
 
 <!-- SANSA Querying -->
+<!--
 <dependency>
     <groupId>net.sansa-stack</groupId>
     <artifactId>sansa-query-spark_${scala.binary.version}</artifactId>
     <version>${sansa.version}</version>
 </dependency>
+-->
 
 <!-- SANSA ML -->
 <dependency>
