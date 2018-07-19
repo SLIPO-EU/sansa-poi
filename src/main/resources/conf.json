@@ -1,0 +1,29 @@
+{
+  "//" : "this format is used to comment",
+  "dataset" : {
+    "input" : "data/tomtom_pois_austria_v0.3.nt",
+    "termValueUri" : "http://slipo.eu/def#termValue",
+    "termPrefix" : "http://slipo.eu/id/term/",
+    "typePOI" : "http://slipo.eu/def#POI",
+    "coordinatesPredicate": "http://www.opengis.net/ont/geosparql#asWKT",
+    "categoryPOI" : "http://slipo.eu/def#category",
+    "poiPrefix" : "http://slipo.eu/id/poi/"
+  },
+  "clustering" : {
+    "//" : "the following is the pic output path",
+    "profile" : "results/profile.txt",
+    "pic" : "results/pic_clusters.json",
+    "oneHotKM" : "results/oneHot_kmeans_clusters.json",
+    "mdsKM" : "results/mds_kmeans_clusters.json",
+    "word2VecKM" : "results/word2vec_kmeans_clusters.json",
+    "picDistanceMatrix" : "results/pic_matrix.json"
+  },
+  "spark" : {
+    "master" : "local[*]",
+    "spark_serializer": "org.apache.spark.serializer.KryoSerializer",
+    "spark_executor_memory" : "10g",
+    "spark_driver_memory" : "10g",
+    "spark_driver_maxResultSize" : "6g",
+    "app_name" : "SLIPO_Clustering"
+  }
+}
