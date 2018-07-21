@@ -1,47 +1,17 @@
 package eu.slipo.poi
 
 import java.io.PrintWriter
-import org.apache.spark.SparkContext
-import org.apache.spark.rdd._
 import org.apache.spark.sql._
 import eu.slipo.algorithms.{Distances, Encoder, Kmeans, PIC}
-import eu.slipo.datatypes.{Cluster, Clusters, Distance, DistanceMatrix, Poi, appConfig}
+import eu.slipo.datatypes.{Distance, DistanceMatrix, appConfig}
 import eu.slipo.utils.tomTomDataProcessing
+import eu.slipo.utils.Common
 import org.json4s._
-import org.json4s.DefaultFormats._
 import org.json4s.native.JsonMethods.parse
 import org.json4s.jackson.Serialization
 
 object poiClustering {
 
-  /**
-   * create a pair RDD and join with another pair RDD
-   *
-   * @param sparkContext
-   * @param ids an array with poi id
-   * @param pairs
-   * @return an array of poi
-   */
-  def join(sparkContext: SparkContext, ids: Array[Long], pairs: RDD[(Long, Poi)]): Array[Poi] = {
-    val idsPair = sparkContext.parallelize(ids).map(x => (x, x))
-    idsPair.join(pairs).map(x => x._2._2).collect()
-  }
-
-  /**
-   * serialize clustering results to file
-   *
-   * @param sparkContext
-   * @param clusters clustering results
-   * @param pois pois object
-   * @return
-   */
-  def writeClusteringResult(sparkContext: SparkContext, clusters: Map[Int, Array[Long]], pois: RDD[Poi], fileWriter: PrintWriter): Unit = {
-    val assignments = clusters.toList.sortBy { case (k, v) => v.length }
-    val poisKeyPair = pois.keyBy(f => f.poi_id).persist()
-    val clustersPois = Clusters(assignments.size, assignments.map(_._2.length).toArray, assignments.map(f => Cluster(f._1, join(sparkContext, f._2, poisKeyPair))))
-    implicit val formats = DefaultFormats
-    Serialization.writePretty(clustersPois, fileWriter)
-  }
 
   /**
    * main function
@@ -56,8 +26,6 @@ object poiClustering {
     val mdsKMFileWriter = new PrintWriter(conf.clustering.mdsKM)
     val word2VecKMFileWriter = new PrintWriter(conf.clustering.word2VecKM)
     val picDistanceMatrixWriter = new PrintWriter(conf.clustering.picDistanceMatrix)
-    //val viennaTriplesWriter = new PrintWriter("results/vienna.nt")
-
 
     // System.setProperty("hadoop.home.dir", "C:\\Hadoop") // for Windows system
     val spark = SparkSession.builder
@@ -79,14 +47,14 @@ object poiClustering {
     // one hot encoding
     val oneHotDF = new Encoder().oneHotEncoding(poiCategorySetVienna, spark)
     val oneHotClusters = new Kmeans().kmClustering(numClusters = 10, df = oneHotDF, spark = spark)
-    writeClusteringResult(spark.sparkContext, oneHotClusters, pois, oneHotKMFileWriter)
+    Common.writeClusteringResult(spark.sparkContext, oneHotClusters, pois, oneHotKMFileWriter)
     val t2 = System.nanoTime()
     profileWriter.println("Elapsed time one hot: " + (t2 - t0)/1000000000 + "s")
 
     // word2Vec encoding
     val avgVectorDF = new Encoder().wordVectorEncoder(poiCategorySetVienna, spark)
     val avgVectorClusters = new Kmeans().kmClustering(numClusters = 10, df = avgVectorDF, spark = spark)
-    writeClusteringResult(spark.sparkContext, avgVectorClusters, pois, word2VecKMFileWriter)
+    Common.writeClusteringResult(spark.sparkContext, avgVectorClusters, pois, word2VecKMFileWriter)
     val t3 = System.nanoTime()
     profileWriter.println("Elapsed time word2Vec: " + (t3 - t0)/1000000000 + "s")
 
@@ -98,7 +66,7 @@ object poiClustering {
     val picDistanceMatrix = DistanceMatrix(pairwisePOISimilarity.map(x => Distance(x._1, x._2, 1-x._3)).collect().toList)
     Serialization.writePretty(picDistanceMatrix, picDistanceMatrixWriter)
     val clustersPIC = new PIC().picSparkML(pairwisePOISimilarity, 10, 5, spark)
-    writeClusteringResult(spark.sparkContext, clustersPIC, pois, picFileWriter)
+    Common.writeClusteringResult(spark.sparkContext, clustersPIC, pois, picFileWriter)
     val t4 = System.nanoTime()
     profileWriter.println("Elapsed time cartesian: " + (t4 - t0)/1000000000 + "s")
 
@@ -106,7 +74,7 @@ object poiClustering {
     val distancePairs = pairwisePOISimilarity.map(x => (x._1, x._2, 1.0 - x._3)).persist()
     val mdsDF = new Encoder().mdsEncoding(distancePairs = distancePairs, poiCategorySetVienna.count().toInt, dimension = 2, spark = spark)
     val mdsClusters = new Kmeans().kmClustering(numClusters = 10, df = mdsDF, spark = spark)
-    writeClusteringResult(spark.sparkContext, mdsClusters, pois, mdsKMFileWriter)
+    Common.writeClusteringResult(spark.sparkContext, mdsClusters, pois, mdsKMFileWriter)
     val t5 = System.nanoTime()
     profileWriter.println("Elapsed time mds: " + (t5 - t0)/1000000000 + "s")
 
@@ -120,6 +88,5 @@ object poiClustering {
     word2VecKMFileWriter.close()
     profileWriter.close()
     spark.stop()
-
   }
 }
