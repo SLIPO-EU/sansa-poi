@@ -16,7 +16,8 @@
     "oneHotKM" : "results/oneHot_kmeans_clusters.json",
     "mdsKM" : "results/mds_kmeans_clusters.json",
     "word2VecKM" : "results/word2vec_kmeans_clusters.json",
-    "picDistanceMatrix" : "results/pic_matrix.json"
+    "picDistanceMatrix" : "results/pic_matrix.json",
+    "mdsCoordinates" : "results/mds_coordinates.json"
   },
   "spark" : {
     "master" : "local[*]",

@@ -98,9 +98,9 @@ class Encoder {
    * @param spark
    * @return encoded coordinates for each poi in DataFrame
    */
-  def mdsEncoding(distancePairs: RDD[(Long, Long, Double)], numPOIS: Int, dimension: Int, spark: SparkSession): DataFrame = {
+  def mdsEncoding(distancePairs: RDD[(Long, Long, Double)], numPOIS: Int, dimension: Int, spark: SparkSession): (DataFrame, Array[(Long, Array[Double])]) = {
     val poi2Coordinates = new multiDS().multiDimensionScaling(distancePairs, numPOIS, dimension)
-    val poi2Coordinates2 = poi2Coordinates.map(x => (x._1.toInt, x._2, x._3))
+    val poi2Coordinates2 = poi2Coordinates.map(x => x._1.toInt :: x._2.toList)
     // create schema
     val fields = Array.ofDim[StructField](dimension + 1)
     val featureColumns = Array.ofDim[String](dimension + 1)
@@ -111,10 +111,10 @@ class Encoder {
       featureColumns(i) = i.toString
     }
     val schema = new StructType(fields)
-    val coordinatesRDD = spark.sparkContext.parallelize(poi2Coordinates2.toSeq).map(x => Row(x._1, x._2, x._3))
+    val coordinatesRDD = spark.sparkContext.parallelize(poi2Coordinates2.toSeq).map(x => Row.fromSeq(x))
     val coordinatesDF = spark.createDataFrame(coordinatesRDD, schema)
     val assembler = new VectorAssembler().setInputCols(featureColumns.slice(1, featureColumns.length)).setOutputCol("features")
     val featureData = assembler.transform(coordinatesDF)
-    featureData
+    (featureData, poi2Coordinates)
   }
 }

@@ -14,7 +14,7 @@ class multiDS {
    * @param dimension dimension of generated coordinates
    * @return poi id and coordinates in given dimension
    */
-  def multiDimensionScaling(distancePairs: RDD[(Long, Long, Double)], numPOIS: Int, dimension: Int): Array[(Long, Double, Double)] = {
+  def multiDimensionScaling(distancePairs: RDD[(Long, Long, Double)], numPOIS: Int, dimension: Int): Array[(Long, Array[Double])] = {
     // vector keep recorded poi
     var vector = Array.ofDim[Long](numPOIS)
     // positive symmetric distance matrix
@@ -43,7 +43,6 @@ class multiDS {
     })
     // create coordinates
     val mds = new MDS(distanceMatrix, dimension, true)
-    mds.getCoordinates.zip(vector).map(x => (x._2, x._1.head.toDouble, x._1.last.toDouble))
+    mds.getCoordinates.zip(vector).map(x => (x._2, x._1))
   }
-
 }

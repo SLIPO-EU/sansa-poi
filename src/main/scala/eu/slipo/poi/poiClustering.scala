@@ -1,9 +1,10 @@
 package eu.slipo.poi
 
 import java.io.PrintWriter
+
 import org.apache.spark.sql._
 import eu.slipo.algorithms.{Distances, Encoder, Kmeans, PIC}
-import eu.slipo.datatypes.{Distance, DistanceMatrix, appConfig}
+import eu.slipo.datatypes._
 import eu.slipo.utils.tomTomDataProcessing
 import eu.slipo.utils.Common
 import org.json4s._
@@ -26,6 +27,7 @@ object poiClustering {
     val mdsKMFileWriter = new PrintWriter(conf.clustering.mdsKM)
     val word2VecKMFileWriter = new PrintWriter(conf.clustering.word2VecKM)
     val picDistanceMatrixWriter = new PrintWriter(conf.clustering.picDistanceMatrix)
+    val mdsCoordinatesWriter = new PrintWriter(conf.clustering.mdsCoordinates)
 
     // System.setProperty("hadoop.home.dir", "C:\\Hadoop") // for Windows system
     val spark = SparkSession.builder
@@ -72,7 +74,9 @@ object poiClustering {
 
     //// distance RDD, from (sid, did, similarity) to (sid, did, distance)
     val distancePairs = pairwisePOISimilarity.map(x => (x._1, x._2, 1.0 - x._3)).persist()
-    val mdsDF = new Encoder().mdsEncoding(distancePairs = distancePairs, poiCategorySetVienna.count().toInt, dimension = 2, spark = spark)
+    val (mdsDF, coordinates) = new Encoder().mdsEncoding(distancePairs = distancePairs, poiCategorySetVienna.count().toInt, dimension = 3, spark = spark)
+    val mdsCoordinates = MdsCoordinates(coordinates.map(f=> MdsCoordinate(f._1, f._2)))
+    Serialization.writePretty(mdsCoordinates, mdsCoordinatesWriter)
     val mdsClusters = new Kmeans().kmClustering(numClusters = 10, df = mdsDF, spark = spark)
     Common.writeClusteringResult(spark.sparkContext, mdsClusters, pois, mdsKMFileWriter)
     val t5 = System.nanoTime()
@@ -87,6 +91,8 @@ object poiClustering {
     mdsKMFileWriter.close()
     word2VecKMFileWriter.close()
     profileWriter.close()
+    picDistanceMatrixWriter.close()
+    mdsCoordinatesWriter.close()
     spark.stop()
   }
 }
