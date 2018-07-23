@@ -14,7 +14,7 @@ class Encoder {
    * @param spark
    * @return one hot encoded DataFrame for each poi
    */
-  def oneHotEncoding(poiCategories: RDD[(Long, Set[Long])], spark: SparkSession): DataFrame = {
+  def oneHotEncoding(poiCategories: RDD[(Long, Set[Long])], spark: SparkSession): (DataFrame, Array[Array[Int]]) = {
     // create a set to contain all categories
     var set = scala.collection.mutable.Set[Long]()
     // put all categories to set
@@ -23,7 +23,6 @@ class Encoder {
     val numPOIS = poiCategories.count().toInt // Array.ofDim only accept Int
     val categoryArray = set.toArray
     val oneHotMatrix = Array.ofDim[Int](numPOIS, categoryArray.length + 1) // one column keep poi id
-
     // initialize distance matrix, collect first needed
     var i = 0
     poiCategories.collect().foreach(x =>
@@ -52,7 +51,7 @@ class Encoder {
     // set up 'features' column
     val assemblerFeatures = new VectorAssembler().setInputCols(featureColumns.slice(1, featureColumns.length)).setOutputCol("features")
     val transformedDf = assemblerFeatures.transform(oneHotEncodedDF)
-    transformedDf
+    (transformedDf, oneHotMatrix)
   }
 
   /**
@@ -62,7 +61,7 @@ class Encoder {
    * @param spark
    * @return word2Vec encoded categories for each poi in DataFrame
    */
-  def wordVectorEncoder(poiCategories: RDD[(Long, Set[Long])], spark: SparkSession): DataFrame = {
+  def wordVectorEncoder(poiCategories: RDD[(Long, Set[Long])], spark: SparkSession): (DataFrame, RDD[(Int, Array[Double])]) = {
     val word2vec = new Word2Vec().setInputCol("inputCol").setMinCount(1)
     val schema = StructType(StructField("inputCol", ArrayType(StringType, true), true) :: Nil)
     val df = spark.createDataFrame(poiCategories.map(f => Row(f._2.map(x => x.toString).toArray)), schema)
@@ -86,7 +85,7 @@ class Encoder {
     val poiAvgVectorDF = spark.createDataFrame(poiAvgVector.map(x => Row.fromSeq(x._1 +: x._2)), schema2)
     val assemblerFeatures = new VectorAssembler().setInputCols(featureColumns.slice(1, featureColumns.length)).setOutputCol("features")
     val transformedDf = assemblerFeatures.transform(poiAvgVectorDF)
-    transformedDf
+    (transformedDf, poiAvgVector)
   }
 
   /**

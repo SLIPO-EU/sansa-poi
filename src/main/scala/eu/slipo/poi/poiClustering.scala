@@ -28,6 +28,8 @@ object poiClustering {
     val word2VecKMFileWriter = new PrintWriter(conf.clustering.word2VecKM)
     val picDistanceMatrixWriter = new PrintWriter(conf.clustering.picDistanceMatrix)
     val mdsCoordinatesWriter = new PrintWriter(conf.clustering.mdsCoordinates)
+    val oneHotMatrixWriter = new PrintWriter(conf.clustering.oneHotMatrix)
+    val word2VecWriter = new PrintWriter(conf.clustering.word2Vec)
 
     // System.setProperty("hadoop.home.dir", "C:\\Hadoop") // for Windows system
     val spark = SparkSession.builder
@@ -47,14 +49,16 @@ object poiClustering {
     profileWriter.println("Elapsed time preparing data: " + (t1 - t0)/1000000000 + "s")
 
     // one hot encoding
-    val oneHotDF = new Encoder().oneHotEncoding(poiCategorySetVienna, spark)
+    val (oneHotDF, oneHotMatrix) = new Encoder().oneHotEncoding(poiCategorySetVienna, spark)
+    Serialization.writePretty(oneHotMatrix, oneHotMatrixWriter)
     val oneHotClusters = new Kmeans().kmClustering(numClusters = 10, df = oneHotDF, spark = spark)
     Common.writeClusteringResult(spark.sparkContext, oneHotClusters, pois, oneHotKMFileWriter)
     val t2 = System.nanoTime()
     profileWriter.println("Elapsed time one hot: " + (t2 - t0)/1000000000 + "s")
 
     // word2Vec encoding
-    val avgVectorDF = new Encoder().wordVectorEncoder(poiCategorySetVienna, spark)
+    val (avgVectorDF, word2Vec) = new Encoder().wordVectorEncoder(poiCategorySetVienna, spark)
+    Serialization.writePretty(word2Vec.collect(), word2VecWriter)
     val avgVectorClusters = new Kmeans().kmClustering(numClusters = 10, df = avgVectorDF, spark = spark)
     Common.writeClusteringResult(spark.sparkContext, avgVectorClusters, pois, word2VecKMFileWriter)
     val t3 = System.nanoTime()
@@ -74,7 +78,7 @@ object poiClustering {
 
     //// distance RDD, from (sid, did, similarity) to (sid, did, distance)
     val distancePairs = pairwisePOISimilarity.map(x => (x._1, x._2, 1.0 - x._3)).persist()
-    val (mdsDF, coordinates) = new Encoder().mdsEncoding(distancePairs = distancePairs, poiCategorySetVienna.count().toInt, dimension = 3, spark = spark)
+    val (mdsDF, coordinates) = new Encoder().mdsEncoding(distancePairs = distancePairs, poiCategorySetVienna.count().toInt, dimension = 2, spark = spark)
     val mdsCoordinates = MdsCoordinates(coordinates.map(f=> MdsCoordinate(f._1, f._2)))
     Serialization.writePretty(mdsCoordinates, mdsCoordinatesWriter)
     val mdsClusters = new Kmeans().kmClustering(numClusters = 10, df = mdsDF, spark = spark)
@@ -84,8 +88,6 @@ object poiClustering {
 
     // dbscan clustering, TODO solve scala version flicts with SANSA
     // dbscanClustering(coordinates, spark)
-    // stop spark session
-    // viennaTriplesWriter.close()
     picFileWriter.close()
     oneHotKMFileWriter.close()
     mdsKMFileWriter.close()
@@ -93,6 +95,8 @@ object poiClustering {
     profileWriter.close()
     picDistanceMatrixWriter.close()
     mdsCoordinatesWriter.close()
+    oneHotMatrixWriter.close()
+    word2VecWriter.close()
     spark.stop()
   }
 }

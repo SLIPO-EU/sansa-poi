@@ -13,7 +13,9 @@ case class Clustering(profile: String,
                       mdsKM: String,
                       word2VecKM: String,
                       picDistanceMatrix: String,
-                      mdsCoordinates: String)
+                      mdsCoordinates: String,
+                      oneHotMatrix: String,
+                      word2Vec: String)
 
 case class Datasets(input: String,
                     termValueUri: String,
