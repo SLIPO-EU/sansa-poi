@@ -11,7 +11,7 @@
     <includeBaseDirectory>true</includeBaseDirectory>
     <dependencySets>
         <dependencySet>
-            <useProjectArtifact>true</useProjectArtifact>
+            <useProjectArtifact>false</useProjectArtifact>
             <outputDirectory>lib</outputDirectory>
             <unpack>false</unpack>
         </dependencySet>
@@ -20,6 +20,10 @@
         <fileSet>
             <directory>data</directory>
             <outputDirectory>data</outputDirectory>
+        </fileSet>
+        <fileSet>
+            <directory>src/main/resources/</directory>
+            <outputDirectory>src/main/resources/</outputDirectory>
         </fileSet>
         <fileSet>
             <directory>results</directory>
