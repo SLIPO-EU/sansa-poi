@@ -14,8 +14,8 @@ class Kmeans {
    * @param spark
    * @return cluster id and corresponding pois in cluster
    */
-  def kmClustering(numClusters: Int, df: DataFrame, spark: SparkSession): Map[Int, Array[Long]] = {
-    val km = new KMeans().setK(numClusters).setSeed(1L).setFeaturesCol("features").setPredictionCol("prediction")
+  def kmClustering(numClusters: Int, maxIter: Int, df: DataFrame, spark: SparkSession): Map[Int, Array[Long]] = {
+    val km = new KMeans().setK(numClusters).setMaxIter(maxIter).setSeed(1L).setFeaturesCol("features").setPredictionCol("prediction")
     val model = km.fit(df)
     val transformedDataFrame = model.transform(df)
     import spark.implicits._

@@ -1,5 +1,6 @@
 package eu.slipo.utils
 
+import com.typesafe.config.Config
 import org.apache.jena.graph.Triple
 import eu.slipo.datatypes.{Categories, Coordinate, Poi, appConfig}
 import net.sansa_stack.rdf.spark.io.NTripleReader
@@ -12,15 +13,15 @@ import org.apache.spark.sql.SparkSession
   * @param spark SparkSession
   * @param conf Configuration
   */
-class tomTomDataProcessing(val spark: SparkSession, val conf: appConfig) extends Serializable {
+class tomTomDataProcessing(val spark: SparkSession, val conf: Config) extends Serializable {
 
-  val dataRDD: RDD[Triple] = NTripleReader.load(spark, conf.dataset.input).persist()
-  var poiCoordinates: RDD[(Long, Coordinate)] = this.getPOICoordinates(16.192851, 16.593533, 48.104194, 48.316388).sample(withReplacement = false, fraction = 0.001, seed = 0).persist()
+  val dataRDD: RDD[Triple] = NTripleReader.load(spark, conf.getString("slipo.data.input")).persist()
+  var poiCoordinates: RDD[(Long, Coordinate)] = this.getPOICoordinates(16.192851, 16.593533, 48.104194, 48.316388).sample(withReplacement = false, fraction = 0.01, seed = 0)
   var poiFlatCategoryId: RDD[(Long, Long)] = this.getPOIFlatCategoryId
-  var poiCategoryId: RDD[(Long, Set[Long])] = this.getCategoryId(poiCoordinates, poiFlatCategoryId)
+  var poiCategoryId: RDD[(Long, Set[Long])] = this.getCategoryId(poiCoordinates, poiFlatCategoryId).persist()
   var poiCategoryValueSet: RDD[(Long, Categories)] = this.getCategoryValues
   var poiCategories: RDD[(Long, Categories)] = this.getPOICategories(poiCoordinates, poiFlatCategoryId, poiCategoryValueSet)
-  var pois: RDD[Poi] = poiCoordinates.join(poiCategories).map(x => Poi(x._1, x._2._1, x._2._2))
+  var pois: RDD[Poi] = poiCoordinates.join(poiCategories).map(x => Poi(x._1, x._2._1, x._2._2)).persist()
 
   /**
     * @param poiCoordinates super set of poi with coordinates
@@ -32,7 +33,7 @@ class tomTomDataProcessing(val spark: SparkSession, val conf: appConfig) extends
     */
   def filterCoordinates(poiCoordinates: RDD[(Long, Coordinate)], lo_min: Double, lo_max: Double, la_min: Double, la_max: Double): RDD[(Long, Coordinate)] = {
     poiCoordinates.filter(x => (x._2.longitude >= lo_min && x._2.longitude <= lo_max)
-      && (x._2.latitude >= la_min && x._2.latitude <= la_max)).persist()
+      && (x._2.latitude >= la_min && x._2.latitude <= la_max))
   }
 
   /**
@@ -41,15 +42,15 @@ class tomTomDataProcessing(val spark: SparkSession, val conf: appConfig) extends
   def getPOICoordinates: RDD[(Long, Coordinate)] ={
     // get the coordinates of pois
     val pattern = "POINT(.+ .+)".r
-    val poiCoordinatesString = dataRDD.filter(x => x.getPredicate.toString().equalsIgnoreCase(conf.dataset.coordinatesPredicate))
-      .map(x => (x.getSubject.toString().replace(conf.dataset.poiPrefix, "").replace("/geometry", "").toLong,
+    val poiCoordinatesString = dataRDD.filter(x => x.getPredicate.toString().equalsIgnoreCase(conf.getString("slipo.data.coordinatesPredicate")))
+      .map(x => (x.getSubject.toString().replace(conf.getString("slipo.data.poiPrefix"), "").replace("/geometry", "").toLong,
         pattern.findFirstIn(x.getObject.toString()).head.replace("POINT", "")
           .replace("^^http://www.opengis.net/ont/geosparql#wktLiteral", "").replaceAll("^\"|\"$", "")))
     // transform to Coordinate object
     poiCoordinatesString.mapValues(x => {
         val coordinates = x.replace("(", "").replace(")", "").split(" ")
         Coordinate(coordinates(0).toDouble, coordinates(1).toDouble)
-      }).persist()
+      })
   }
 
   /**
@@ -68,11 +69,11 @@ class tomTomDataProcessing(val spark: SparkSession, val conf: appConfig) extends
     * @return (poi, category_id)
     */
   def getPOIFlatCategoryId: RDD[(Long, Long)] ={
-    val poiFlatCategories = dataRDD.filter(x => x.getPredicate.toString().equalsIgnoreCase(conf.dataset.categoryPOI))
+    val poiFlatCategories = dataRDD.filter(x => x.getPredicate.toString().equalsIgnoreCase(conf.getString("slipo.data.categoryPOI")))
     poiFlatCategories.map(x => (
-      x.getSubject.toString().replace(conf.dataset.poiPrefix, "").toLong,
-      x.getObject.toString().replace(conf.dataset.termPrefix, "").toLong)
-    ).persist()
+      x.getSubject.toString().replace(conf.getString("slipo.data.poiPrefix"), "").toLong,
+      x.getObject.toString().replace(conf.getString("slipo.data.termPrefix"), "").toLong)
+    )
   }
 
   /**
@@ -84,9 +85,9 @@ class tomTomDataProcessing(val spark: SparkSession, val conf: appConfig) extends
     */
   def getPOICategories(poiCoordinates: RDD[(Long, Coordinate)], poiFlatCategoryId: RDD[(Long, Long)], poiCategoryValueSet: RDD[(Long, Categories)]): RDD[(Long, Categories)] ={
     // from (poi, category_id) map-> (category_id, poi) join-> (category_id, (poi, Categories)) map-> (poi, Categories) groupByKey-> (poi_unique, Iterable(Categories))
-    val poiCategorySets = poiFlatCategoryId.map(f => (f._2, f._1)).join(poiCategoryValueSet).map(f => (f._2._1, f._2._2)).groupByKey().persist()
+    val poiCategorySets = poiFlatCategoryId.map(f => (f._2, f._1)).join(poiCategoryValueSet).map(f => (f._2._1, f._2._2)).groupByKey()
     // from (poi_unique, Iterable(Categories)) join-> (poi_unique, (Coordinate, Iterable(Categories))) map-> (poi_unique, Categories)
-    poiCoordinates.join(poiCategorySets).map(x => (x._1, Categories(collection.mutable.Set(x._2._2.flatMap(_.categories).toList:_*)))).persist()
+    poiCoordinates.join(poiCategorySets).map(x => (x._1, Categories(collection.mutable.Set(x._2._2.flatMap(_.categories).toList:_*))))
   }
 
   /**
@@ -95,13 +96,13 @@ class tomTomDataProcessing(val spark: SparkSession, val conf: appConfig) extends
     */
   def getCategoryValues: RDD[(Long, Categories)] = {
     // get category id(s)
-    val categoryTriples = dataRDD.filter(x => x.getPredicate.toString().equalsIgnoreCase(conf.dataset.termValueUri))
+    val categoryTriples = dataRDD.filter(x => x.getPredicate.toString().equalsIgnoreCase(conf.getString("slipo.data.termValueUri")))
     // get category id and it's corresponding values
     val categoriesIdValues = categoryTriples.map(x => (
-      x.getSubject.toString().replace(conf.dataset.termPrefix, "").toLong,
+      x.getSubject.toString().replace(conf.getString("slipo.data.termPrefix"), "").toLong,
       x.getObject.toString().replaceAll("\"", "")))
     // group by id and put all values of category to a set
-    categoriesIdValues.groupByKey().map(x => (x._1, Categories(scala.collection.mutable.Set(x._2.toList: _*)))).persist()
+    categoriesIdValues.groupByKey().map(x => (x._1, Categories(scala.collection.mutable.Set(x._2.toList: _*))))
   }
 
   /**
