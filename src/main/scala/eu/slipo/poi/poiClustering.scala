@@ -43,7 +43,8 @@ object poiClustering {
     val t0 = System.nanoTime()
     val tomTomData = new tomTomDataProcessing(spark = spark, conf = conf)
     val pois = tomTomData.pois
-    val poiCategorySetVienna = tomTomData.poiCategoryId
+    //val poiCategorySetVienna = tomTomData.poiCategoryId
+    val poiCategorySetVienna = pois.map(poi => (poi.poi_id, poi.categories.categories.toSet))
     profileWriter.println(pois.count())
     profileWriter.println(poiCategorySetVienna.count())
     val t1 = System.nanoTime()

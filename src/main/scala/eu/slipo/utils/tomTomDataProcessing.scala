@@ -2,7 +2,7 @@ package eu.slipo.utils
 
 import com.typesafe.config.Config
 import org.apache.jena.graph.Triple
-import eu.slipo.datatypes.{Categories, Coordinate, Poi, appConfig}
+import eu.slipo.datatypes.{Categories, Coordinate, Poi}
 import net.sansa_stack.rdf.spark.io.NTripleReader
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
@@ -19,9 +19,11 @@ class tomTomDataProcessing(val spark: SparkSession, val conf: Config) extends Se
   var poiCoordinates: RDD[(Long, Coordinate)] = this.getPOICoordinates(16.192851, 16.593533, 48.104194, 48.316388).sample(withReplacement = false, fraction = 0.01, seed = 0)
   var poiFlatCategoryId: RDD[(Long, Long)] = this.getPOIFlatCategoryId
   var poiCategoryId: RDD[(Long, Set[Long])] = this.getCategoryId(poiCoordinates, poiFlatCategoryId).persist()
-  var poiCategoryValueSet: RDD[(Long, Categories)] = this.getCategoryValues
-  var poiCategories: RDD[(Long, Categories)] = this.getPOICategories(poiCoordinates, poiFlatCategoryId, poiCategoryValueSet)
-  var pois: RDD[Poi] = poiCoordinates.join(poiCategories).map(x => Poi(x._1, x._2._1, x._2._2)).persist()
+  var poiCategoryValueSet: RDD[(Long, Categories)] = this.getCategoryValues  //(category_id, Categories)
+  var poiCategories: RDD[(Long, Categories)] = this.getPOICategories(poiCoordinates, poiFlatCategoryId, poiCategoryValueSet)  // (poi_id, Categories)
+  val poiYelpCategories: RDD[(Long, Categories)] = this.getYelpCategories(dataRDD)
+  val poiAllCategories: RDD[(Long, Categories)] = poiCategories.join(poiYelpCategories).map(x => (x._1, Categories(x._2._1.categories++x._2._2.categories)))
+  var pois: RDD[Poi] = poiCoordinates.join(poiAllCategories).map(x => Poi(x._1, x._2._1, x._2._2)).persist()
 
   /**
     * @param poiCoordinates super set of poi with coordinates
@@ -112,5 +114,15 @@ class tomTomDataProcessing(val spark: SparkSession, val conf: Config) extends Se
     */
   def getCategoryId(poiCoordinates: RDD[(Long, Coordinate)], poiFlatCategoryId: RDD[(Long, Long)]): RDD[(Long, Set[Long])] = {
     poiCoordinates.join(poiFlatCategoryId.groupByKey()).map(x => (x._1, x._2._2.toSet))
+  }
+
+
+  def getYelpCategories(mergedRDD: RDD[Triple]):RDD[(Long, Categories)] = {
+    val yelpPOICategory = mergedRDD.filter(triple => triple.getPredicate.toString.equalsIgnoreCase(conf.getString("yelp.data.categoryPOI")))
+    val yelpPOICategoryMapped = yelpPOICategory.map(triple => (
+      triple.getSubject.toString().replace(conf.getString("slipo.data.poiPrefix"), "").toLong,
+      triple.getObject.toString()
+    ))
+    yelpPOICategoryMapped.groupByKey().map(x => (x._1, Categories(scala.collection.mutable.Set(x._2.toList: _*))))
   }
 }

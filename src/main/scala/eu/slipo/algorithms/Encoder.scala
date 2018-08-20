@@ -14,9 +14,9 @@ class Encoder {
    * @param spark
    * @return one hot encoded DataFrame for each poi
    */
-  def oneHotEncoding(poiCategories: RDD[(Long, Set[Long])], spark: SparkSession): (DataFrame, Array[Array[Int]]) = {
+  def oneHotEncoding(poiCategories: RDD[(Long, Set[String])], spark: SparkSession): (DataFrame, Array[Array[Int]]) = {
     // create a set to contain all categories
-    var set = scala.collection.mutable.Set[Long]()
+    var set = scala.collection.mutable.Set[String]()
     // put all categories to set
     poiCategories.collect().foreach(x => x._2.foreach(y => set += y))
     // create columns base on the length of set
@@ -61,12 +61,12 @@ class Encoder {
    * @param spark
    * @return word2Vec encoded categories for each poi in DataFrame
    */
-  def wordVectorEncoder(poiCategories: RDD[(Long, Set[Long])], spark: SparkSession): (DataFrame, RDD[(Int, Array[Double])]) = {
+  def wordVectorEncoder(poiCategories: RDD[(Long, Set[String])], spark: SparkSession): (DataFrame, RDD[(Int, Array[Double])]) = {
     val word2vec = new Word2Vec().setInputCol("inputCol").setMinCount(1)
     val schema = StructType(StructField("inputCol", ArrayType(StringType, true), true) :: Nil)
     val df = spark.createDataFrame(poiCategories.map(f => Row(f._2.map(x => x.toString).toArray)), schema)
     val wordVectorsRDD = word2vec.fit(df).getVectors.select("word", "vector").rdd
-    val vectors = wordVectorsRDD.map(f => (f.getString(0).toLong, f.getAs[org.apache.spark.ml.linalg.DenseVector](1)))
+    val vectors = wordVectorsRDD.map(f => (f.getString(0), f.getAs[org.apache.spark.ml.linalg.DenseVector](1)))
     val categoryVectors = vectors.collectAsMap()
     val poiCategoryVectors = poiCategories.map(f => (f._1, f._2.map(x => categoryVectors.get(x).head.toArray)))
     val poiVector = poiCategoryVectors.map(f => (f._1, f._2.size, f._2.toArray.toList.transpose.map(_.sum).toArray))
