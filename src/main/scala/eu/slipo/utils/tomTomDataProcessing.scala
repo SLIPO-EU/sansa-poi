@@ -1,5 +1,7 @@
 package eu.slipo.utils
 
+import java.io.{File, FilenameFilter}
+
 import com.typesafe.config.Config
 import org.apache.jena.graph.Triple
 import eu.slipo.datatypes.{Categories, Coordinate, Poi}
@@ -15,7 +17,8 @@ import org.apache.spark.sql.SparkSession
   */
 class tomTomDataProcessing(val spark: SparkSession, val conf: Config) extends Serializable {
 
-  val dataRDD: RDD[Triple] = NTripleReader.load(spark, conf.getString("slipo.data.input")).persist()
+  //val dataRDD: RDD[Triple] = NTripleReader.load(spark, conf.getString("slipo.data.input")).persist()
+  val dataRDD: RDD[Triple] = loadNTriple(conf.getString("slipo.data.input"))
   var poiCoordinates: RDD[(Long, Coordinate)] = this.getPOICoordinates(16.192851, 16.593533, 48.104194, 48.316388).sample(withReplacement = false, fraction = 0.01, seed = 0)
   var poiFlatCategoryId: RDD[(Long, Long)] = this.getPOIFlatCategoryId
   var poiCategoryId: RDD[(Long, Set[Long])] = this.getCategoryId(poiCoordinates, poiFlatCategoryId).persist()
@@ -24,6 +27,29 @@ class tomTomDataProcessing(val spark: SparkSession, val conf: Config) extends Se
   val poiYelpCategories: RDD[(Long, Categories)] = this.getYelpCategories(dataRDD)
   val poiAllCategories: RDD[(Long, Categories)] = poiCategories.join(poiYelpCategories).map(x => (x._1, Categories(x._2._1.categories++x._2._2.categories)))
   var pois: RDD[Poi] = poiCoordinates.join(poiAllCategories).map(x => Poi(x._1, x._2._1, x._2._2)).persist()
+
+  def loadNTriple(tripleFilePath: String): RDD[Triple] = {
+    val tripleFile = new File(tripleFilePath)
+    if(tripleFile.isDirectory){
+      val files = tripleFile.listFiles(new FilenameFilter() {
+        def accept(tripleFile: File, name: String):Boolean= {
+          !(name.toString.contains("SUCCESS") || name.toLowerCase.endsWith(".crc"))
+        }
+      })
+      var i = 0
+      var triple_0 = NTripleReader.load(spark, files(0).getAbsolutePath).persist()
+      for(file <- files){
+        if(i!=0){
+          triple_0 = triple_0.union(NTripleReader.load(spark, file.getAbsolutePath).persist())
+        }
+        i+=1
+      }
+      triple_0
+    }else{
+      NTripleReader.load(spark, tripleFile.getAbsolutePath).persist()
+    }
+  }
+
 
   /**
     * @param poiCoordinates super set of poi with coordinates
