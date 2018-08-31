@@ -20,7 +20,7 @@ object mergeTomTomYelp extends Serializable {
   val fileWriter = new PrintWriter(conf.getString("yelp.slipo.merged_file"))
 
   def mergeYelpSlipoData(slipoRDD: RDD[Triple], yelpRDD: RDD[Triple], conf: Config): Unit = {
-    val yelpCategories = yelpRDD.filter(triple => triple.getPredicate.hasURI("http://slipo.eu/hasYelpCategory"))
+    val yelpCategories = yelpRDD.filter(triple => triple.getPredicate.hasURI("http://slipo.eu/hasYelpCategory") || triple.getPredicate.hasURI("http://slipo.eu/hasRating"))
     val mergedRDD = yelpCategories.union(slipoRDD).persist()
 
     /*mergedRDD.foreach(x => {
