@@ -5,9 +5,12 @@ import java.io.{File, FilenameFilter}
 import com.typesafe.config.Config
 import org.apache.jena.graph.Triple
 import eu.slipo.datatypes.{Categories, Coordinate, Poi}
-import net.sansa_stack.rdf.spark.io.NTripleReader
+import net.sansa_stack.rdf.spark.io.{ErrorParseMode, NTripleReader}
+import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.functions.broadcast
+import org.junit.Ignore
 
 
 /**
@@ -19,20 +22,48 @@ class tomTomDataProcessing(val spark: SparkSession, val conf: Config) extends Se
 
   //val dataRDD: RDD[Triple] = NTripleReader.load(spark, conf.getString("slipo.data.input")).persist()
   val dataRDD: RDD[Triple] = loadNTriple(conf.getString("slipo.data.input"))
-  //var poiCoordinates: RDD[(Long, Coordinate)] = this.getPOICoordinates(16.192851, 16.593533, 48.104194, 48.316388).sample(withReplacement = false, fraction = 0.01, seed = 0)
-  var poiCoordinates: RDD[(Long, Coordinate)] = this.getPOICoordinates
+  println("Total number of pois: " + dataRDD.count().toString)
+  //var poiCoordinates: RDD[(Long, Coordinate)] = this.getPOICoordinates(16.192851, 16.593533, 48.104194, 48.316388).sample(withReplacement = false, fraction = 0.005, seed = 0)
+  var poiCoordinates: RDD[(Long, Coordinate)] = this.getPOICoordinates.persist()
   var poiFlatCategoryId: RDD[(Long, Long)] = this.getPOIFlatCategoryId
   var poiCategoryId: RDD[(Long, Set[Long])] = this.getCategoryId(poiCoordinates, poiFlatCategoryId).persist()
   var poiCategoryValueSet: RDD[(Long, Categories)] = this.getCategoryValues  //(category_id, Categories)
-  var poiCategories: RDD[(Long, Categories)] = this.getPOICategories(poiCoordinates, poiFlatCategoryId, poiCategoryValueSet)  // (poi_id, Categories)
-  val poiYelpCategories: RDD[(Long, (Categories, Double))] = this.getYelpCategories(dataRDD).sample(withReplacement = false, fraction = 0.1, seed = 0)
+  var poiCategories: RDD[(Long, Categories)] = this.getPOICategories(poiCoordinates, poiFlatCategoryId, poiCategoryValueSet).persist()  // (poi_id, Categories)
+  val poiYelpCategories: RDD[(Long, (Categories, Double))] = this.getYelpCategories(dataRDD).sample(withReplacement = false, fraction = 0.025, seed = 0).persist()
+  println("Yelp category: " + poiYelpCategories.count().toString)
   var pois: RDD[Poi] = {if(!poiYelpCategories.isEmpty()){
+    println("Get POIs from Yelp")
     //val poiAllCategories: RDD[(Long, Categories, Double)] = poiCategories.join(poiYelpCategories).map(x => (x._1, (Categories(x._2._1.categories++x._2._2._1.categories), x._2._2._2))
     val poiAllCategories: RDD[(Long, (Categories, Double))] = poiYelpCategories.join(poiCategories).map(x => (x._1, (Categories(x._2._1._1.categories++x._2._2.categories), x._2._1._2)))
-    poiCoordinates.join(poiAllCategories).map(x => Poi(x._1, x._2._1, x._2._2._1, x._2._2._2)).persist()
+    filterJoin(poiAllCategories.collectAsMap(), poiCoordinates)
+    //poiCoordinates.join(spark.sparkContext.broadcast(poiAllCategoriesCollection)).map(x => Poi(x._1, x._2._1, x._2._2._1, x._2._2._2)).persist()
   }else{
+    println("Get POIs from TOM TOM")
     poiCoordinates.join(poiCategories).map(x => Poi(x._1, x._2._1, x._2._2, 0.0)).persist()
   }}
+
+  def broadCastJoin(poiAllCategories: RDD[(Long, (Categories, Double))], poiCoordinates: RDD[(Long, Coordinate)]): RDD[Poi] = {
+    val poiAllCategoriesMap: Broadcast[collection.Map[Long, (Categories, Double)]] = spark.sparkContext.broadcast(poiAllCategories.collectAsMap())
+    poiCoordinates.flatMap{
+      case(key, value) => poiAllCategoriesMap.value.get(key).map{
+        x => Poi(key, value, x._1, x._2)
+      }
+    }
+  }
+
+  def filterJoin(poiAllCategories: scala.collection.Map[Long, (Categories, Double)], poiCoordinates: RDD[(Long, Coordinate)]): RDD[Poi] = {
+    val poiCoordinatesFiltered = poiCoordinates.filter{
+      x => {
+        poiAllCategories.contains(x._1)
+      }
+    }
+    poiCoordinatesFiltered.map{
+      x => {
+        val poiCategoryReview: (Categories, Double) = poiAllCategories.get(x._1).head
+        Poi(x._1, x._2, poiCategoryReview._1, poiCategoryReview._2)
+      }
+    }
+  }
 
   def loadNTriple(tripleFilePath: String): RDD[Triple] = {
     val tripleFile = new File(tripleFilePath)
@@ -43,7 +74,7 @@ class tomTomDataProcessing(val spark: SparkSession, val conf: Config) extends Se
         }
       })
       var i = 0
-      var triple_0 = NTripleReader.load(spark, files(0).getAbsolutePath)
+      var triple_0 = NTripleReader.load(spark, files(0).getAbsolutePath, stopOnBadTerm = ErrorParseMode.SKIP)
       for(file <- files){
         if(i!=0){
           triple_0 = triple_0.union(NTripleReader.load(spark, file.getAbsolutePath))
@@ -53,7 +84,7 @@ class tomTomDataProcessing(val spark: SparkSession, val conf: Config) extends Se
       triple_0
     }
     else{
-      NTripleReader.load(spark, tripleFile.getAbsolutePath)
+      NTripleReader.load(spark, tripleFile.getAbsolutePath, stopOnBadTerm = ErrorParseMode.SKIP)
     }
   }
 
@@ -150,7 +181,7 @@ class tomTomDataProcessing(val spark: SparkSession, val conf: Config) extends Se
   }
 
 
-  def getYelpCategories(mergedRDD: RDD[Triple]):RDD[(Long, (Categories, Double))] = {
+  def getYelpCategories(mergedRDD: RDD[Triple]): RDD[(Long, (Categories, Double))] = {
     val yelpPOICategory = mergedRDD.filter(triple => triple.getPredicate.toString.equalsIgnoreCase(conf.getString("yelp.data.categoryPOI")))
     println(conf.getString("yelp.data.rating"))
     val yelpPOIRating = mergedRDD.filter(triple => triple.getPredicate.toString.contains(conf.getString("yelp.data.rating")))
@@ -160,7 +191,7 @@ class tomTomDataProcessing(val spark: SparkSession, val conf: Config) extends Se
     println(yelpPOIRating.count())
     val yelpPOICategoryMapped = yelpPOICategory.map(triple => (
       triple.getSubject.toString().replace(conf.getString("slipo.data.poiPrefix"), "").toLong,
-      triple.getObject.toString()
+      triple.getObject.toString().replaceAll("\"", "")
     ))
     val yelpPOIRatingMapped = yelpPOIRating.map(triple => (
       triple.getSubject.toString().replace(conf.getString("slipo.data.poiPrefix"), "").toLong,

@@ -23,19 +23,25 @@ object mergeTomTomYelp extends Serializable {
     val yelpCategories = yelpRDD.filter(triple => triple.getPredicate.hasURI("http://slipo.eu/hasYelpCategory") || triple.getPredicate.hasURI("http://slipo.eu/hasRating"))
     val mergedRDD = yelpCategories.union(slipoRDD).persist()
 
-    /*mergedRDD.foreach(x => {
+    mergedRDD.foreach(t => {
       val objStr =
-        if (x.getObject.isLiteral) {
-          val objectParts = x.getObject.toString().split(Pattern.quote("^^"))
-          s"${objectParts(0)}^^<${x.getObject.getLiteralDatatypeURI}>"
+        if (t.getObject.isLiteral) {
+          val splittedObject: Array[String] = t.getObject.toString.split("^^")
+          val head = splittedObject.head
+          val obj = if (head.contains("^^")){
+            val parts = head.split("\\^\\^")
+            parts.head
+          }else{
+            splittedObject.head
+          }
+          obj//+"^^<"+t.getObject.getLiteralDatatypeURI+">"
         } else {
-          //s"<${x.getObject}>"
-          s""
+          s"<${t.getObject}>"
         }
-      fileWriter.println(s"<${x.getSubject}> <${x.getPredicate}> $objStr .")
-    })*/
-    //fileWriter.println()
-    mergedRDD.saveAsNTriplesFile("data/merged_tomtom_yelp")
+
+      fileWriter.println(s"<${t.getSubject}> <${t.getPredicate}> ${objStr.replace("\n", "")} .")
+    })
+    //mergedRDD.saveAsNTriplesFile("data/merged_tomtom_yelp")
   }
 
 

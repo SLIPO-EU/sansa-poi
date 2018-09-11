@@ -20,8 +20,8 @@
     <scala.version>2.11.11</scala.version>
     <scala.binary.version>2.11</scala.binary.version>
     <spark.version>2.2.1</spark.version>
-    <jena.version>3.5.0</jena.version>
-    <sansa.version>0.3.1-SNAPSHOT</sansa.version>
+    <jena.version>3.7.0</jena.version>
+    <sansa.version>0.4.1-SNAPSHOT</sansa.version>
     <src.dir>src/main/scala</src.dir>
     <output.dir>target/classes</output.dir>
 </properties>

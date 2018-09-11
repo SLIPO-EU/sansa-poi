@@ -37,6 +37,10 @@ object poiClustering {
       .config("spark.executor.memory", conf.getString("slipo.spark.executor.memory"))
       .config("spark.driver.memory", conf.getString("slipo.spark.driver.memory"))
       .config("spark.driver.maxResultSize", conf.getString("slipo.spark.driver.maxResultSize"))
+      .config("spark.ui.port", conf.getInt("slipo.spark.ui.port"))
+      .config("spark.executor.cores", conf.getInt("slipo.spark.executor.cores"))
+      .config("spark.executor.heartbeatInterval", conf.getLong("slipo.spark.executor.heartbeatInterval"))
+      .config("spark.network.timeout", conf.getLong("slipo.spark.network.timeout"))
       //.config("spark.memory.fraction", conf.getString("spark.memory.fraction"))
       .appName(conf.getString("slipo.spark.app.name"))
       .getOrCreate()
@@ -47,15 +51,15 @@ object poiClustering {
     val tomTomData = new tomTomDataProcessing(spark = spark, conf = conf)
 
     val pois = tomTomData.pois
-    println(pois.count())
+    println("Number of pois: " + pois.count().toString)
     //val poiCategorySetVienna = tomTomData.poiCategoryId
-    val poiCategorySetVienna = pois.map(poi => (poi.poi_id, poi.categories.categories.toSet))
+    val poiCategorySetVienna = pois.map(poi => (poi.poi_id, poi.categories.categories.toSet)).persist()
     profileWriter.println(pois.count())
     profileWriter.println(poiCategorySetVienna.count())
     val t1 = System.nanoTime()
     profileWriter.println("Elapsed time preparing data: " + (t1 - t0)/1000000000 + "s")
 
-
+    /*
     // one hot encoding
     println("Start one hot encoding km")
     val (oneHotDF, oneHotMatrix) = new Encoder().oneHotEncoding(poiCategorySetVienna, spark)
@@ -81,26 +85,43 @@ object poiClustering {
    val t3 = System.nanoTime()
    profileWriter.println("Elapsed time word2Vec: " + (t3 - t0)/1000000000 + "s")
     println("End one hot encoding km")
+    */
 
     println("Start PIC")
   // pic clustering, build ((sid, ()), (did, ())) RDD
-  val pairwisePOICategorySet = poiCategorySetVienna.cartesian(poiCategorySetVienna).filter { case (a, b) => a._1 < b._1 }
+    println("Start cartesian")
+    println(poiCategorySetVienna.count())
+    println(poiCategorySetVienna.take(1).mkString(","))
+    poiCategorySetVienna.collect().foreach(x => println(x._1))
+    poiCategorySetVienna.foreach(f => println(f._2.size))
+    val poiCartesian = poiCategorySetVienna.cartesian(poiCategorySetVienna)
+    println("Cartesian: " + poiCartesian.count())
+    val pairwisePOICategorySet = poiCartesian.filter { case (a, b) => {
+      println(a._1.toString+"; "+b._1.toString)
+      a._1 < b._1
+    }
+  }
+    println(pairwisePOICategorySet.count())
+  println("end of cartesian")
   // from ((sid, ()), (did, ())) to (sid, did, similarity)
   val pairwisePOISimilarity = pairwisePOICategorySet.map(x => (x._1._1.toLong, x._2._1.toLong,
     new Distances().jaccardSimilarity(x._1._2, x._2._2))).persist()
 
-  val picDistanceMatrix = DistanceMatrix(pairwisePOISimilarity.map(x => Distance(x._1, x._2, 1-x._3)).collect().toList)
+    println("get similarity matrix")
+  val picDistanceMatrix = pairwisePOISimilarity.map(x => Distance(x._1, x._2, 1-x._3)).collect()
   Serialization.writePretty(picDistanceMatrix, picDistanceMatrixWriter)
+    picDistanceMatrixWriter.close()
+
+    println("start pic clustering")
   val clustersPIC = new PIC().picSparkML(pairwisePOISimilarity,
                                          conf.getInt("slipo.clustering.pic.number_clusters"),
                                          conf.getInt("slipo.clustering.pic.iterations"),
                                          spark)
-  Common.writeClusteringResult(spark.sparkContext, clustersPIC, pois, picFileWriter)
-  val t4 = System.nanoTime()
-  profileWriter.println("Elapsed time cartesian: " + (t4 - t0)/1000000000 + "s")
-
+    println("end pic clustering")
+    Common.writeClusteringResult(spark.sparkContext, clustersPIC, pois, picFileWriter)
+    val t4 = System.nanoTime()
+    profileWriter.println("Elapsed time cartesian: " + (t4 - t0)/1000000000 + "s")
     println("End PIC")
-
     println("Start MDS")
     //// distance RDD, from (sid, did, similarity) to (sid, did, distance)
     val distancePairs = pairwisePOISimilarity.map(x => (x._1, x._2, 1.0 - x._3)).persist()
@@ -125,7 +146,6 @@ object poiClustering {
     mdsKMFileWriter.close()
     word2VecKMFileWriter.close()
     profileWriter.close()
-    picDistanceMatrixWriter.close()
     mdsCoordinatesWriter.close()
     oneHotMatrixWriter.close()
     word2VecWriter.close()
