@@ -59,7 +59,6 @@ object poiClustering {
     val t1 = System.nanoTime()
     profileWriter.println("Elapsed time preparing data: " + (t1 - t0)/1000000000 + "s")
 
-    /*
     // one hot encoding
     println("Start one hot encoding km")
     val (oneHotDF, oneHotMatrix) = new Encoder().oneHotEncoding(poiCategorySetVienna, spark)
@@ -85,7 +84,6 @@ object poiClustering {
    val t3 = System.nanoTime()
    profileWriter.println("Elapsed time word2Vec: " + (t3 - t0)/1000000000 + "s")
     println("End one hot encoding km")
-    */
 
     println("Start PIC")
   // pic clustering, build ((sid, ()), (did, ())) RDD
@@ -108,6 +106,7 @@ object poiClustering {
     new Distances().jaccardSimilarity(x._1._2, x._2._2))).persist()
 
     println("get similarity matrix")
+
   val picDistanceMatrix = pairwisePOISimilarity.map(x => Distance(x._1, x._2, 1-x._3)).collect()
   Serialization.writePretty(picDistanceMatrix, picDistanceMatrixWriter)
     picDistanceMatrixWriter.close()

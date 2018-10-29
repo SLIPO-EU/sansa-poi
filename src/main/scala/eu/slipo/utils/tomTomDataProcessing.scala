@@ -29,7 +29,7 @@ class tomTomDataProcessing(val spark: SparkSession, val conf: Config) extends Se
   var poiCategoryId: RDD[(Long, Set[Long])] = this.getCategoryId(poiCoordinates, poiFlatCategoryId).persist()
   var poiCategoryValueSet: RDD[(Long, Categories)] = this.getCategoryValues  //(category_id, Categories)
   var poiCategories: RDD[(Long, Categories)] = this.getPOICategories(poiCoordinates, poiFlatCategoryId, poiCategoryValueSet).persist()  // (poi_id, Categories)
-  val poiYelpCategories: RDD[(Long, (Categories, Double))] = this.getYelpCategories(dataRDD).sample(withReplacement = false, fraction = 0.025, seed = 0).persist()
+  val poiYelpCategories: RDD[(Long, (Categories, Double))] = this.getYelpCategories(dataRDD).persist()
   println("Yelp category: " + poiYelpCategories.count().toString)
   var pois: RDD[Poi] = {if(!poiYelpCategories.isEmpty()){
     println("Get POIs from Yelp")
@@ -153,7 +153,7 @@ class tomTomDataProcessing(val spark: SparkSession, val conf: Config) extends Se
     // from (poi, category_id) map-> (category_id, poi) join-> (category_id, (poi, Categories)) map-> (poi, Categories) groupByKey-> (poi_unique, Iterable(Categories))
     val poiCategorySets = poiFlatCategoryId.map(f => (f._2, f._1)).join(poiCategoryValueSet).map(f => (f._2._1, f._2._2)).groupByKey()
     // from (poi_unique, Iterable(Categories)) join-> (poi_unique, (Coordinate, Iterable(Categories))) map-> (poi_unique, Categories)
-    poiCoordinates.join(poiCategorySets).map(x => (x._1, Categories(collection.mutable.Set(x._2._2.flatMap(_.categories).toList:_*))))
+    poiCoordinates.join(poiCategorySets).map(x => (x._1, Categories(Set(x._2._2.flatMap(_.categories).toList:_*))))
   }
 
   /**
@@ -168,7 +168,7 @@ class tomTomDataProcessing(val spark: SparkSession, val conf: Config) extends Se
       x.getSubject.toString().replace(conf.getString("slipo.data.termPrefix"), "").toLong,
       x.getObject.toString().replaceAll("\"", "")))
     // group by id and put all values of category to a set
-    categoriesIdValues.groupByKey().map(x => (x._1, Categories(scala.collection.mutable.Set(x._2.toList: _*))))
+    categoriesIdValues.groupByKey().map(x => (x._1, Categories(Set(x._2.toList: _*))))
   }
 
   /**
@@ -197,6 +197,6 @@ class tomTomDataProcessing(val spark: SparkSession, val conf: Config) extends Se
       triple.getSubject.toString().replace(conf.getString("slipo.data.poiPrefix"), "").toLong,
       triple.getObject.getLiteralValue.toString.toDouble
       ))
-    yelpPOICategoryMapped.groupByKey().join(yelpPOIRatingMapped).map(x => (x._1, (Categories(scala.collection.mutable.Set(x._2._1.toList: _*)), x._2._2)))
+    yelpPOICategoryMapped.groupByKey().join(yelpPOIRatingMapped).map(x => (x._1, (Categories(Set(x._2._1.toList: _*)), x._2._2)))
   }
 }
