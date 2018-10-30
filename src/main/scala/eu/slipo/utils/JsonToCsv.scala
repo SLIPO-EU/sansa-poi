@@ -35,7 +35,7 @@ object JsonToCsv {
         headerLine.append("Categories")
         bw.write(headerLine.toString)
         bw.newLine()
-        // write for each poin
+        // write for each poi
         cluster.poi_in_cluster.foreach(poi => {
           val oneLine = new StringBuffer()
           oneLine.append(poi.poi_id)
