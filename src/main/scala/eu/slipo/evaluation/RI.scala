@@ -2,20 +2,20 @@ package eu.slipo.evaluation
 
 import eu.slipo.datatypes.Clusters
 
-class RI {
+class RI(clusters: Clusters) {
 
   /**
     * Calculate Rand index
-    * @param clusters clustering result
     */
-  def calRandInformationFScore(clusters: Clusters): (Double, Double, Double, Double, Double) ={
+  def calRandInformationFScore(): (Double, Double, Double, Double, Double) ={
     val canonicalString = new CanonicalString()
 
     // all pair of pois that are clustered into each cluster
     var tp_fp = 0
     clusters.clusters.foreach(cluster => {
-      tp_fp += calComb(cluster.poi_in_cluster.length, 2)
+      tp_fp += choose(cluster.poi_in_cluster.length, 2)
     })
+    println("tp_fp: ", tp_fp)
 
     // pair of same category poi that are assigned into same cluster
     var tp = 0
@@ -27,7 +27,7 @@ class RI {
     clusterPoiCanonical.foreach(cluster => {
       cluster.foreach(category => {
         if(category._2 > 1){
-          tp += calComb(category._2, 2)
+          tp += choose(category._2, 2)
         }
       })
     })
@@ -57,28 +57,22 @@ class RI {
       })
     }
     val tn = fn_tn - fn
-    val ri = (tp + tn) / (tp + tn + fp + fn)
+    val ri = (tp + tn).toDouble / (tp + tn + fp + fn)
     (ri, tp, fp, tn, fn)
   }
 
   /**
-    * Calculate combinatorial
+    * choose k from n
     * @param n
     * @param k
     * @return
     */
-  def calComb(n: Int, k: Int): Int ={
-    //calFactorial(n) / (calFactorial(k) * calFactorial(n - k))
-    0
+  def choose(n: Int, k: Int): Int ={
+    if (k == 0 || k == n){
+      1
+    }
+    else{
+      choose(n - 1, k - 1) + choose(n - 1, k)
+    }
   }
-
-  /**
-    * Calculate factorial
-    * @param n
-    * @return
-    */
-  /*def calFactorial(n: Int): Int ={
-    case 0 => 1
-    case _ => n * calFactorial(n - 1)
-  }*/
 }

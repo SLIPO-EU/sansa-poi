@@ -2,12 +2,12 @@ package eu.slipo.evaluation
 
 import eu.slipo.datatypes.Clusters
 
-class Purity {
+class Purity(clusterResults: Clusters) {
 
   /**
     * Calculate purity of given clustering result
     */
-  def calPurity(clusterResults: Clusters): Double ={
+  def calPurity(): Double ={
     val clusters = clusterResults.clusters
     val cS = new CanonicalString()
     // map each poi in cluster to canonical string representation
@@ -25,6 +25,6 @@ class Purity {
       correctLabeled += f.max
       totalPoi += f.sum
     })
-    correctLabeled / totalPoi
+    correctLabeled / totalPoi.toDouble
   }
 }
