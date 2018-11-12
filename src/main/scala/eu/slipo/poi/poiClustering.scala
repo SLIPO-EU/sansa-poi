@@ -121,7 +121,6 @@ object poiClustering {
     val t4 = System.nanoTime()
     profileWriter.println("Elapsed time cartesian: " + (t4 - t0)/1000000000 + "s")
     println("End PIC")
-    /*
     println("Start MDS")
     //// distance RDD, from (sid, did, similarity) to (sid, did, distance)
     val distancePairs = pairwisePOISimilarity.map(x => (x._1, x._2, 1.0 - x._3)).persist()
@@ -141,8 +140,7 @@ object poiClustering {
     println("End MDS")
     // dbscan clustering, TODO solve scala version flicts with SANSA
     // dbscanClustering(coordinates, spark)
-    */
-    Common.plotClusterResults(List(onehotKMClusters, word2vecKMClusters, picClusters), "results/")
+    Common.writeClusteringResults(List(onehotKMClusters, word2vecKMClusters, picClusters, mdsKMClusters), "results/results.csv")
     picFileWriter.close()
     oneHotKMFileWriter.close()
     mdsKMFileWriter.close()

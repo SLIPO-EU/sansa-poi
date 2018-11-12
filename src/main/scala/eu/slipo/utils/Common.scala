@@ -1,8 +1,8 @@
 package eu.slipo.utils
 
-import java.io.PrintWriter
-
+import java.io._
 import java.awt.Color
+
 import eu.slipo.datatypes.{Cluster, Clusters, Poi}
 import eu.slipo.evaluation.{FScore, NMI, Purity, RI}
 import org.apache.spark.SparkContext
@@ -12,6 +12,7 @@ import org.json4s.jackson.Serialization
 
 import scala.collection.mutable.ListBuffer
 import breeze.plot._
+import eu.slipo.utils.JsonToCsv.CSV_DILEMITER
 
 
 
@@ -70,6 +71,7 @@ object Common {
       println(metrics.mkString(";"))
       println(indexes.mkString(","))
       plt += scatter(indexes, metrics, {_ => 0.025}, { _:Int => colors(counter)},  {_ => labels(counter)})
+      println(counter)
       counter += 1
     })
     plt.title = "Clustering Evaluation"
@@ -80,5 +82,50 @@ object Common {
     plt.xlim(-1.0, 5.0)
     //plt.legend
     f.saveas("results/clusteringEvaMetrics.png")
+  }
+
+  /**
+    * Write clustering results to file
+    */
+  def writeClusteringResults(listClusters: List[Clusters], pathSave: String): Unit ={
+    val CSV_DILEMITER: String = ","
+    val headers = List("Algorithms", "Purity", "NMI", "RI", "F Score")
+    val algorithms = List("OntHot KM", "Word2Vec KM", "PIC", "MDS KM")
+    try {
+      val bw = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(pathSave), "UTF-8"))
+      // write header to csv
+      val headerLine = new StringBuffer()
+      headers.foreach(header => {
+        headerLine.append(header)
+        headerLine.append(CSV_DILEMITER)
+      })
+      bw.write(headerLine.toString)
+      bw.newLine()
+      // write clustering result metrics
+      var counter = 0
+      listClusters.foreach(clusters => {
+        val oneLine = new StringBuffer()
+        oneLine.append(algorithms(counter))
+        oneLine.append(CSV_DILEMITER)
+        val metrics: ListBuffer[Double] = new ListBuffer[Double]
+        metrics.append(new Purity(clusters).calPurity())
+        metrics.append(new NMI(clusters).calNMI())
+        val (ri, tp, fp, tn, fn) = new RI(clusters).calRandInformationFScore()
+        metrics.append(ri)
+        metrics.append(new FScore().calFScore(fp, tp, fn))
+        metrics.foreach(metric => {
+          oneLine.append(metric)
+          oneLine.append(CSV_DILEMITER)
+        })
+        bw.write(oneLine.toString)
+        bw.newLine()
+        counter += 1
+      })
+      bw.flush()
+      bw.close()
+    } catch {
+      case ioe: IOException =>
+      case e: Exception =>
+    }
   }
 }
