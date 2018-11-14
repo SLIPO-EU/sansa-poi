@@ -12,7 +12,7 @@ class PIC {
   /*
    * Power Iteration clustering algorithm from Spark standard library
    * */
-  def picSparkML(pairwisePOISimilarity: RDD[(Long, Long, Double)], numCentroids: Int, numIterations: Int, sparkSession: SparkSession) = {
+  def picSparkML(pairwisePOISimilarity: RDD[(Long, Long, Double)], numCentroids: Int, numIterations: Int, sparkSession: SparkSession):Map[Int, Array[Long]] = {
     val model = new PowerIterationClustering().setK(numCentroids).setMaxIterations(numIterations).setInitializationMode("degree").run(pairwisePOISimilarity)
     val clusters = model.assignments.collect().groupBy(_.cluster).mapValues(_.map(_.id))
     clusters
