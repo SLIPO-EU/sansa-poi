@@ -71,7 +71,7 @@ class Encoder {
     val poiCategoryVectors = poiCategories.map(f => (f._1, f._2.map(x => categoryVectors.get(x).head.toArray)))
     val poiVector = poiCategoryVectors.map(f => (f._1, f._2.size, f._2.toArray.toList.transpose.map(_.sum).toArray))
     val leng = poiVector.take(1)(0)._2
-    val poiAvgVector = poiVector.map(x => (x._1.toInt, x._3.map(y => y / x._2)))
+    val poiAvgVector = poiVector.map(x => (x._1.toInt, x._3.map(y => y / x._2.toDouble)))
     val fields = Array.ofDim[StructField](leng + 1)
     val featureColumns = Array.ofDim[String](leng + 1)
     // keep other columns with integer type

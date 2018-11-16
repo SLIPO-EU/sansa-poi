@@ -15,7 +15,7 @@ class RI(clusters: Clusters) {
     clusters.clusters.foreach(cluster => {
       tp_fp += choose(cluster.poi_in_cluster.length, 2)
     })
-    println("tp_fp: ", tp_fp)
+    //println("tp_fp: ", tp_fp)
 
     // pair of same category poi that are assigned into same cluster
     var tp = 0
