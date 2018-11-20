@@ -1,4 +1,4 @@
-# sansa-poi
+# SANSA-POI
 
 This repository contains code to process RDF dataset in SLIPO project which contains a certain amount of 
 Point of Interest(POI). Furthermore, we did some clustering analysis of the data.
