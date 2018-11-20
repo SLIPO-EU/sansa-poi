@@ -62,7 +62,7 @@ object poiClustering {
     // one hot encoding
     println("Start one hot encoding km")
     val (oneHotDF, oneHotMatrix) = new Encoder().oneHotEncoding(poiCategorySetVienna, spark)
-    Serialization.writePretty(oneHotMatrix, oneHotMatrixWriter)
+    //Serialization.writePretty(oneHotMatrix, oneHotMatrixWriter)
     val oneHotClusters = new Kmeans().kmClustering(numClusters=conf.getInt("slipo.clustering.km.onehot.number_clusters"),
                                                    maxIter=conf.getInt("slipo.clustering.km.onehot.iterations"),
                                                    df=oneHotDF,
@@ -75,7 +75,7 @@ object poiClustering {
    // word2Vec encoding
   println("Start word2vec encoding km")
    val (avgVectorDF, word2Vec) = new Encoder().wordVectorEncoder(poiCategorySetVienna, spark)
-   Serialization.writePretty(word2Vec.collect(), word2VecWriter)
+   //Serialization.writePretty(word2Vec.collect(), word2VecWriter)
    val avgVectorClusters = new Kmeans().kmClustering(numClusters = conf.getInt("slipo.clustering.km.word2vec.number_clusters"),
                                                      maxIter=conf.getInt("slipo.clustering.km.word2vec.iterations"),
                                                      df=avgVectorDF,
@@ -108,8 +108,8 @@ object poiClustering {
     println("get similarity matrix")
 
   val picDistanceMatrix = pairwisePOISimilarity.map(x => Distance(x._1, x._2, 1-x._3)).collect()
-  Serialization.writePretty(picDistanceMatrix, picDistanceMatrixWriter)
-    picDistanceMatrixWriter.close()
+  //Serialization.writePretty(picDistanceMatrix, picDistanceMatrixWriter)
+   // picDistanceMatrixWriter.close()
 
     println("start pic clustering")
   val clustersPIC = new PIC().picSparkML(pairwisePOISimilarity,
@@ -129,7 +129,7 @@ object poiClustering {
                                                           dimension = conf.getInt("slipo.clustering.km.mds.dimension"),
                                                           spark = spark)
     val mdsCoordinates = MdsCoordinates(coordinates.map(f=> MdsCoordinate(f._1, f._2)))
-    Serialization.writePretty(mdsCoordinates, mdsCoordinatesWriter)
+    //Serialization.writePretty(mdsCoordinates, mdsCoordinatesWriter)
     val mdsClusters = new Kmeans().kmClustering(numClusters = conf.getInt("slipo.clustering.km.mds.number_clusters"),
                                                 maxIter=conf.getInt("slipo.clustering.km.mds.iterations"),
                                                 df = mdsDF,
