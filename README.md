@@ -10,7 +10,7 @@ we developed several encoding methods to encode categorical data to numerical.
 
 1. OneHot Encoding
 2. Word2Vec Encoding (from Spark ML)
-3. Multidimensional Scaling Encoding (Third Party Library, see pom.xmls)
+3. Multidimensional Scaling Encoding (Third Party Library, see pom.xml)
 
 
 ## Project Management
