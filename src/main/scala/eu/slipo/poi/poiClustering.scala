@@ -9,10 +9,9 @@ import eu.slipo.utils.tomTomDataProcessing
 import eu.slipo.utils.Common
 import org.json4s._
 import com.typesafe.config.ConfigFactory
-import org.json4s.jackson.Serialization
+
 
 object poiClustering {
-
 
   /**
    * main function
@@ -68,25 +67,27 @@ object poiClustering {
                                                    df=oneHotDF,
                                                    spark=spark)
     val onehotKMClusters = Common.writeClusteringResult(spark.sparkContext, oneHotClusters, pois, oneHotKMFileWriter)
+    Common.seralizeToNT(spark.sparkContext, oneHotClusters, pois)
     val t2 = System.nanoTime()
     profileWriter.println("Elapsed time one hot: " + (t2 - t0)/1000000000 + "s")
     println("End one hot encoding km")
 
-   // word2Vec encoding
-  println("Start word2vec encoding km")
-   val (avgVectorDF, word2Vec) = new Encoder().wordVectorEncoder(poiCategorySetVienna, spark)
-   //Serialization.writePretty(word2Vec.collect(), word2VecWriter)
-   val avgVectorClusters = new Kmeans().kmClustering(numClusters = conf.getInt("slipo.clustering.km.word2vec.number_clusters"),
+
+    // word2Vec encoding
+    println("Start word2vec encoding km")
+    val (avgVectorDF, word2Vec) = new Encoder().wordVectorEncoder(poiCategorySetVienna, spark)
+    //Serialization.writePretty(word2Vec.collect(), word2VecWriter)
+    val avgVectorClusters = new Kmeans().kmClustering(numClusters = conf.getInt("slipo.clustering.km.word2vec.number_clusters"),
                                                      maxIter=conf.getInt("slipo.clustering.km.word2vec.iterations"),
                                                      df=avgVectorDF,
                                                      spark=spark)
     val word2vecKMClusters = Common.writeClusteringResult(spark.sparkContext, avgVectorClusters, pois, word2VecKMFileWriter)
-   val t3 = System.nanoTime()
-   profileWriter.println("Elapsed time word2Vec: " + (t3 - t0)/1000000000 + "s")
+    val t3 = System.nanoTime()
+    profileWriter.println("Elapsed time word2Vec: " + (t3 - t0)/1000000000 + "s")
     println("End one hot encoding km")
 
     println("Start PIC")
-  // pic clustering, build ((sid, ()), (did, ())) RDD
+    // pic clustering, build ((sid, ()), (did, ())) RDD
     println("Start cartesian")
     println(poiCategorySetVienna.count())
     println(poiCategorySetVienna.take(1).mkString(","))
@@ -95,24 +96,22 @@ object poiClustering {
     val poiCartesian = poiCategorySetVienna.cartesian(poiCategorySetVienna)
     println("Cartesian: " + poiCartesian.count())
     val pairwisePOICategorySet = poiCartesian.filter { case (a, b) => {
-      println(a._1.toString+"; "+b._1.toString)
-      a._1 < b._1
+        println(a._1.toString+"; "+b._1.toString)
+        a._1 < b._1
+      }
     }
-  }
     println(pairwisePOICategorySet.count())
-  println("end of cartesian")
-  // from ((sid, ()), (did, ())) to (sid, did, similarity)
-  val pairwisePOISimilarity = pairwisePOICategorySet.map(x => (x._1._1.toLong, x._2._1.toLong,
+    println("end of cartesian")
+    // from ((sid, ()), (did, ())) to (sid, did, similarity)
+    val pairwisePOISimilarity = pairwisePOICategorySet.map(x => (x._1._1.toLong, x._2._1.toLong,
     new Distances().jaccardSimilarity(x._1._2, x._2._2))).persist()
-
     println("get similarity matrix")
 
-  val picDistanceMatrix = pairwisePOISimilarity.map(x => Distance(x._1, x._2, 1-x._3)).collect()
-  //Serialization.writePretty(picDistanceMatrix, picDistanceMatrixWriter)
-   // picDistanceMatrixWriter.close()
-
+    val picDistanceMatrix = pairwisePOISimilarity.map(x => Distance(x._1, x._2, 1-x._3)).collect()
+    //Serialization.writePretty(picDistanceMatrix, picDistanceMatrixWriter)
+    //picDistanceMatrixWriter.close()
     println("start pic clustering")
-  val clustersPIC = new PIC().picSparkML(pairwisePOISimilarity,
+    val clustersPIC = new PIC().picSparkML(pairwisePOISimilarity,
                                          conf.getInt("slipo.clustering.pic.number_clusters"),
                                          conf.getInt("slipo.clustering.pic.iterations"),
                                          spark)
@@ -138,8 +137,6 @@ object poiClustering {
     val t5 = System.nanoTime()
     profileWriter.println("Elapsed time mds: " + (t5 - t0)/1000000000 + "s")
     println("End MDS")
-    // dbscan clustering, TODO solve scala version flicts with SANSA
-    // dbscanClustering(coordinates, spark)
     Common.writeClusteringResults(List(onehotKMClusters, word2vecKMClusters, picClusters, mdsKMClusters), "results/results.csv")
     picFileWriter.close()
     oneHotKMFileWriter.close()
