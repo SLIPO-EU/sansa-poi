@@ -20,6 +20,7 @@ import eu.slipo.datatypes.{ Cluster, Clusters }
 import org.apache.spark.sql.DataFrame
 import eu.slipo.datatypes.Poi
 import org.apache.spark.sql.functions._
+import eu.slipo.datatypes.Coordinate
 
 object stayPointAlgo {
   def main(args: Array[String]): Unit = {
@@ -104,7 +105,7 @@ object stayPointAlgo {
     //calculating time difference where user stay and compare it with Tmin
     val timeDiff = rddToDF.withColumn("difference(min)", (unix_timestamp($"endtime") - unix_timestamp($"starttime")) / 60)
     val filterTmin = timeDiff.filter($"difference(min)" > conf.getString("slipo.min.time"))
-    
+
     //calculating distance between two consecutive locations
     val crossJoinDf = filterTmin.as("d1").crossJoin(filterTmin.as("d2")).filter($"d1.id" === $"d2.id" && $"d1.lat" =!= $"d2.lat"
       && $"d1.endtime" < $"d2.starttime")
@@ -149,7 +150,7 @@ object stayPointAlgo {
     val clustersJson = json.extract[Clusters]
     clusterSearch(clustersJson.clusters.head, minTime, conf)
   }
-  
+
   def stringBuilder(fis: FileInputStream): String = {
     val br = new BufferedReader(new InputStreamReader(fis, "UTF-8"))
     val sb: StringBuilder = new StringBuilder
@@ -164,7 +165,7 @@ object stayPointAlgo {
     }
     sb.toString()
   }
-  
+
   def clusterSearch(cluster: Cluster, minTime: DataFrame, config: Config) {
     val userWant = "Indian Resturant"
     val filterLatLong = minTime.select("predcited lat/long")
@@ -173,30 +174,35 @@ object stayPointAlgo {
       latLong
     }).collect().mkString(",")
 
-    val lat = toRDD.substring(1, toRDD.indexOf(","))
-    val long = toRDD.substring(toRDD.indexOf(",") + 1).replace(")", "")
+    val lat = toRDD.substring(1, toRDD.indexOf(",")).toDouble
+    val latDec = BigDecimal(lat).setScale(3, BigDecimal.RoundingMode.HALF_UP).toDouble
+    val long = toRDD.substring(toRDD.indexOf(",") + 1).replace(")", "").toDouble
+    val longDec = BigDecimal(long).setScale(3, BigDecimal.RoundingMode.HALF_UP).toDouble
     var poiCluster: Array[Poi] = null
-   // println("lat=" + lat + " " + "long=" + long)
+    var m = List[Coordinate]()
+    println("lat=" + latDec + " " + "long=" + longDec)
+
     cluster.poi_in_cluster.foreach(poi => {
-      if (poi.coordinate.latitude == lat.toDouble && poi.coordinate.longitude == long.toDouble) {
-        poiCluster = cluster.poi_in_cluster      
+      if (latDec - 0.05 <= poi.coordinate.latitude && poi.coordinate.latitude < latDec + 0.05 && poi.coordinate.longitude < longDec + 0.05 && poi.coordinate.longitude > longDec - 0.05) {
+        poiCluster = cluster.poi_in_cluster
       }
     })
+    
     val searchStringCategories = poiCluster.filter(f => searchString(userWant, f.categories.categories.toString()))
     if (searchStringCategories.isEmpty)
-      println(s"Stay point close to $lat , $long is a good place to open an $userWant")
+      println(s"Stay point close to $latDec , $longDec is a good place to open an $userWant")
     else {
       val checkRating = searchStringCategories.map({ f =>
         if (f.review > config.getString("slipo.min.rating").toDouble) {
           println(s"Stay point is not a good place to open the $userWant")
         } else {
-          println(s"Stay point close to $lat , $long is a good place to open an $userWant")
+          println(s"Stay point close to $latDec , $longDec is a good place to open an $userWant")
         }
       })
     }
   }
-  
-  def searchString(x: String, y: String): Boolean = { 
+
+  def searchString(x: String, y: String): Boolean = {
     val regexX = x.r
     val findXinY = regexX.findAllIn(y)
     if (findXinY.length > 0) {
