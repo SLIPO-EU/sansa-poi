@@ -16,7 +16,7 @@ we developed several encoding methods to encode categorical data to numerical.
 Staypoint algorithm determines the stay point based on spatiotemporal data. Stay point is defined as the
 place where user stays for a while. Stay point is bounded by two parameters i.e., T<sub>min</sub> and D<sub>max</sub>. The minimum time user must be in same place to consider it a stay point is given by T<sub>min</sub>. Whereas D<sub>max</sub> is the maximum distance between two consecutive places. By combining stay point with yelp data, one can determine the interesting venues in a region. 
 
-   * Input data:- Spatiotempral RDF data, T<sub>min</sub>,D<sub>max</sub>
+   * Input data:- Spatiotempral RDF data, T<sub>min</sub> and D<sub>max</sub>
    * Output: stay points in a region
 
   
