@@ -12,7 +12,14 @@ we developed several encoding methods to encode categorical data to numerical.
 2. Word2Vec Encoding (from Spark ML)
 3. Multidimensional Scaling Encoding (Third Party Library, see pom.xml)
 
+## Staypoint Algorithm
+Staypoint algorithm determines the stay point based on spatiotemporal data. Stay point is defined as the
+place where user stays for a while. Stay point is bounded by two parameters- Tmin and Dmax. The minimum time user must be in same place to consider it a stay point is given by Tmin. Whereas Dmax is the maximum distance between two consecutive places. By combining stay point with yelp data, one can determine the interesting venues in a region. 
 
+   * Input data:- Spatiotempral RDF data, Tmin,Dmax
+   * Output: stay points in a region
+
+  
 ## Project Management
 The project is managed using Maven in order to make it easily runnable in different platform. 
 We provided a `run.sh` shell script to package and run the project with maven profile `dev`, and it should be easily 
