@@ -8,3 +8,4 @@ package eu.slipo.datatypes
  * @param categories, categories of poi
  */
 case class Poi(poi_id: Long, coordinate: Coordinate, categories: Categories, review: Double)
+case class PoiOSM(poi_id: Long, coordinate: Coordinate, categories: String)
